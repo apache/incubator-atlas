@@ -36,8 +36,7 @@
                    <tr data-ng-repeat="(key,value) in details.values" ng-if="value && !(key==='columns') && !(key==='name') && !(key==='description')">
                         <td>{{key}}</td>   
                         <td data-ng-if="!isString(value) && !isNumber(value)" data-ng-include="'/modules/details/views/attribute.html'"></td>
-                        <td data-ng-if="isString(value)">{{value | date:'medium'}}</td>
-                        <td data-ng-if="isNumber(value)">{{value | date:'medium'}}</td>
+                        <td data-ng-if="isString(value) || isNumber(value)">{{value | date:'medium'}}</td> 
                     </tr>
                     </tbody>
                 </table>
