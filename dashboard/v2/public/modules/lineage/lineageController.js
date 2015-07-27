@@ -64,6 +64,7 @@ angular.module('dgc.lineage').controller('LineageController', ['$element', '$sco
 
         function render() {
             renderGraph($scope.lineageData, {
+                eleObj : $element,
                 element: $element[0],
                 height: $element[0].offsetHeight,
                 width: $element[0].offsetWidth
