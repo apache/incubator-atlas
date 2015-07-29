@@ -546,7 +546,7 @@ angular.module('dgc.lineage').controller('LineageController', ['$element', '$sco
         // Set widths between levels based on maxLabelLength.
         nodes.forEach(function(d) {
             var noOfnodes = levelWidth.length - d.depth;
-            d.y = (levelWidth[noOfnodes] > 3) ? (d.depth * (maxLabelLength * 35)) : (d.depth * (maxLabelLength * 10)) ;  
+            d.y = (levelWidth[noOfnodes] > 4) ? (d.depth * (maxLabelLength * 60)) : (d.depth * (maxLabelLength * 10)) ;  
             // alternatively to keep a fixed scale one can set a fixed depth per level
             // Normalize for fixed-depth by commenting out below line
             // d.y = (d.depth * 500); //500px per level.
