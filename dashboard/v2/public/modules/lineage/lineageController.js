@@ -496,7 +496,7 @@ angular.module('dgc.lineage').controller('LineageController', ['$element', '$sco
                 .append("svg:marker")
                 .attr("id", "arrow")
                 .attr("viewBox", "0 0 10 10")
-                .attr("refX", 26)
+                .attr("refX", 22)
                 .attr("refY", 5)
                 .attr("markerUnits", "strokeWidth")
                 .attr("markerWidth", 6)
