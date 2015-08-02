@@ -177,7 +177,8 @@ angular.module('dgc.lineage').controller('LineageController', ['$element', '$sco
                 panBoundary = 20, 
                 i = 0,
                 duration = 750,
-                root;
+                root,
+                depthwidth = 10;
                 
 
             var viewerWidth = widthg - 15,
@@ -457,10 +458,10 @@ angular.module('dgc.lineage').controller('LineageController', ['$element', '$sco
     // Function to center node when clicked/dropped so node doesn't get lost when collapsing/moving with large amount of children.
 
     function centerNode(source) {
-        var scale = zoomListener.scale();
+        var scale =  (depthwidth === 10) ? zoomListener.scale() : 0.4;
         var x = -source.y0;
         var y = -source.x0;
-        x = x * scale + (viewerWidth / 2) - 100;
+        x = x * scale + 150;
         y = y * scale + viewerHeight / 2;
         d3.select('g').transition()
             .duration(duration)
@@ -545,12 +546,13 @@ angular.module('dgc.lineage').controller('LineageController', ['$element', '$sco
 
         // Set widths between levels based on maxLabelLength.
         nodes.forEach(function(d) {
-            var noOfnodes = levelWidth.length - d.depth;
-            d.y = (levelWidth[noOfnodes] > 4) ? (d.depth * (maxLabelLength * 60)) : (d.depth * (maxLabelLength * 10)) ;  
-            // alternatively to keep a fixed scale one can set a fixed depth per level
-            // Normalize for fixed-depth by commenting out below line
-            // d.y = (d.depth * 500); //500px per level.
-        });
+            if(levelWidth.length > 1 && depthwidth === 10){
+               for(var o=0; o < levelWidth.length; o++){
+                  if(levelWidth[o] > 4 ) { depthwidth = 60; }
+               }
+            } 
+            d.y = (d.depth * (maxLabelLength * depthwidth));           
+        }); 
 
         // Update the nodes…
         node = svgGroup.selectAll("g.node")
