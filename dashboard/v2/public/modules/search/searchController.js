@@ -79,11 +79,6 @@ angular.module('dgc.search').controller('SearchController', ['$scope', '$locatio
                 $scope.searchMessage = '0 results matching your search query ' + $scope.query + ' were found';
                 NotificationService.error('Error occurred during executing search query, error status code = ' + err.status + ', status text = ' + err.statusText, false);
             });
-            $state.go('search', {
-                query: query
-            }, {
-                location: 'replace'
-            });
         };
 
         $scope.filterResults = function() {
