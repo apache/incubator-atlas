@@ -20,7 +20,6 @@
 
 angular.module('dgc.search').controller('SearchController', ['$scope', '$location', '$http', '$state', '$stateParams', 'lodash', 'SearchResource', 'NotificationService',
     function($scope, $location, $http, $state, $stateParams, _, SearchResource, NotificationService) {
-
         $scope.results = [];
         $scope.resultCount = 0;
         $scope.isCollapsed = true;
@@ -105,10 +104,5 @@ angular.module('dgc.search').controller('SearchController', ['$scope', '$locatio
             return res;
         };
         $scope.searchQuery = $location.search();
-        $scope.query = ($location.search()).query;
-        if ($scope.query) {
-
-            $scope.search($scope.query);
-        }
     }
 ]);

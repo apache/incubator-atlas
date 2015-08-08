@@ -30,7 +30,14 @@ angular.module('dgc.search').config(['$stateProvider',
         $stateProvider.state('search.list', {
           url: '/results?query',
           templateUrl: '/modules/search/views/searchResult.html',
-          controller: 'SearchController'
+          controller: ['$scope', '$location',
+            function($scope, $location) {
+                $scope.query = $scope.$parent.query =($location.search()).query;
+                if ($scope.query) {
+                    $scope.$parent.search($scope.query);
+                }
+            }
+          ]
         });
     }
 ]);
