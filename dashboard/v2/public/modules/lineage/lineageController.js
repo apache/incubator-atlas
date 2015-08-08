@@ -400,15 +400,6 @@ angular.module('dgc.lineage').controller('LineageController', ['$element', '$sco
         }
     }
 
-    // Helper functions for collapsing and expanding nodes.
-
-    /*function collapse(d) {
-        if (d.children) {
-            d._children = d.children;
-            d._children.forEach(collapse);
-            d.children = null;
-        }
-    }*/
 
     function expand(d) {
         if (d._children) {
@@ -416,16 +407,7 @@ angular.module('dgc.lineage').controller('LineageController', ['$element', '$sco
             d.children.forEach(expand);
             d._children = null;
         }
-    }
-
-   /* var overCircle = function(d) {
-        selectedNode = d;
-        updateTempConnector();
-    };
-    var outCircle = function(d) {
-        selectedNode = null;
-        updateTempConnector();
-    };*/
+    } 
 
     // Function to update the temporary connector indicating dragging affiliation
     var updateTempConnector = function() {
@@ -537,8 +519,7 @@ angular.module('dgc.lineage').controller('LineageController', ['$element', '$sco
             }
         };
         childCount(0, root);
-       // var newHeight = d3.max(levelWidth) * 25; // 25 pixels per line  
-        tree = tree.nodeSize([40, 100]); //size([newHeight, viewerWidth])
+        tree = tree.nodeSize([40, 100]); 
 
         // Compute the new tree layout.
         var nodes = tree.nodes(root).reverse(),
