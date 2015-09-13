@@ -17,29 +17,69 @@
  */
 'use strict';
 
-angular.module('dgc.lineage').controller('LineageController', ['$element', '$scope', '$state', '$stateParams', 'lodash', 'LineageResource', 'd3', 'DetailsResource', '$q',
+angular.module('dgc.lineage_io').controller('Lineage_ioController', ['$element', '$scope', '$state', '$stateParams', 'lodash', 'Lineage_ioResource', 'd3', 'DetailsResource', '$q',
     function($element, $scope, $state, $stateParams, _, LineageResource, d3, DetailsResource, $q) {
         var guidsList = [];
 
-        function getLineageData(tableData, callRender) {
+        function inVertObj(edgs) {
+            var newEdgsObj = {};
+
+            $.each(edgs, function(key, value) {
+                for (var k = 0; k < value.length; k++) {
+                    newEdgsObj[value[k]] = newEdgsObj[value[k]] || [];
+                    newEdgsObj[value[k]] = [key];
+                }
+            });
+            return newEdgsObj;
+        }
+
+        function getCombinedLineageData(tableData, callRender) {
             LineageResource.get({
                 tableName: tableData.tableName,
-                type: tableData.type
-            }, function lineageSuccess(response) {
-                if (!_.isEmpty(response.results.values.vertices)) {
-                    loadProcess(response.results.values.edges, response.results.values.vertices)
+                type: 'outputs'
+            }, function lineageSuccess(response1) {
+
+                LineageResource.get({
+                    tableName: tableData.tableName,
+                    type: 'inputs'
+                }, function lineageSuccess(response) {
+                    response.results.values.edges = inVertObj(response.results.values.edges);
+
+                    angular.forEach(response.results.values.edges, function(value, key) {
+                        angular.forEach(response1.results.values.edges, function(value1, key1) {
+                            if (key === key1) {
+                                var array1 = value;
+                                angular.forEach(value1, function(value2) {
+                                    array1.push(value2);
+                                });
+                                response.results.values.edges[key] = array1;
+                                response1.results.values.edges[key] = array1;
+                            }
+                        });
+                    });
+
+                    angular.extend(response.results.values.edges, response1.results.values.edges);
+                    angular.extend(response.results.values.vertices, response1.results.values.vertices);
+
+                    if (!_.isEmpty(response.results.values.vertices)) {
+                        loadProcess(response.results.values.edges, response.results.values.vertices)
                         .then(function(res) {
                             guidsList = res;
+
                             $scope.lineageData = transformData(response.results);
+
                             if (callRender) {
                                 render();
                             }
                         });
-                } else {
+                    }
                     $scope.requested = false;
-                }
+                });
+
             });
+
         }
+
 
         function loadProcess(edges, vertices) {
 
@@ -88,7 +128,12 @@ angular.module('dgc.lineage').controller('LineageController', ['$element', '$sco
             if (lineageData.type === $scope.type) {
                 if (!$scope.lineageData) {
                     if (!$scope.requested) {
-                        getLineageData(lineageData, true);
+                        if ($scope.type === 'io') {
+                            console.log($scope.type);
+                            getCombinedLineageData(lineageData, true);
+                        } else {
+                           getCombinedLineageData(lineageData, true);
+                        }
                         $scope.requested = true;
                     }
                 } else {
@@ -160,17 +205,27 @@ angular.module('dgc.lineage').controller('LineageController', ['$element', '$sco
                 attachParent(edge, node);
             }
 
-            /* Return the first node w/o parent, this is root node*/
-            return _.find(nodes, function(node) {
-                return !node.hasOwnProperty('parent');
+            var starTingObj = {
+                name: 'root',
+                guid: 'root',
+                children: []
+            };
+
+            angular.forEach(nodes, function(value) {
+                if (!value.hasOwnProperty('parent')) {
+                    starTingObj.children.push(value);
+                }
             });
+
+            return starTingObj; 
         }
 
         function renderGraph(data, container) {
             // ************** Generate the tree diagram  *****************
             var element = d3.select(container.element),
-                widthg = Math.max(container.width, 960),
-                heightg = Math.max(container.height, 500),
+                widthg = Math.max(container.width, 1100),
+                //heightg = Math.max(container.height, 500),
+                heightg = Math.max((window. innerHeight - 380), 500),
 
                 totalNodes = 0,
                 maxLabelLength = 0,
@@ -192,8 +247,8 @@ angular.module('dgc.lineage').controller('LineageController', ['$element', '$sco
             var viewerWidth = widthg - 15,
                 viewerHeight = heightg;
 
-            var tree = d3.layout.tree().nodeSize([100, 200]);
-            /*.size([viewerHeight, viewerWidth]);*/
+            var tree = d3.layout.tree().size([viewerHeight, viewerWidth]);
+            /*.size([viewerHeight, viewerWidth]);   nodeSize([100, 200]);*/
 
             container.eleObj.find(".graph").html('');
             container.eleObj.find("svg").remove();
@@ -240,12 +295,10 @@ angular.module('dgc.lineage').controller('LineageController', ['$element', '$sco
             // Sort the tree initially incase the JSON isn't in a sorted order.
             sortTree();
 
-            // Define the zoom function for the zoomable tree
-
+            // Define the zoom function for the zoomable tree  
             function zoom() {
                 svgGroup.attr("transform", "translate(" + d3.event.translate + ")scale(" + d3.event.scale + ")");
-            }
-
+            } 
 
             // define the zoomListener which calls the zoom function on the "zoom" event constrained within the scaleExtents
             var zoomListener = d3.behavior.zoom().scaleExtent([0.1, 3]).on("zoom", zoom);
@@ -445,8 +498,27 @@ angular.module('dgc.lineage').controller('LineageController', ['$element', '$sco
                 tree = tree.nodeSize([50, 100]);
 
                 // Compute the new tree layout.
-                var nodes = tree.nodes(root).reverse(),
-                    links = tree.links(nodes);
+                var nodes = tree.nodes(root).reverse();
+
+                nodes = _.uniq(nodes, 'guid');
+
+                _.each(nodes, function(o, i) {
+                    var itemsOfTheSameDepth = _.where(nodes, {
+                        depth: o.depth
+                    });
+                    var indexOfCurrent = _.indexOf(itemsOfTheSameDepth, o);
+                    var interval = viewerHeight / itemsOfTheSameDepth.length;
+                    nodes[i].x = interval / 2 + (interval * indexOfCurrent);
+                });
+
+                var links = tree.links(nodes);
+
+                _.each(links, function(o, i) {
+                    //links[i].target = _.find(nodes, {guid: o.target.id});
+                    links[i].target = _.find(nodes, {
+                        guid: o.target.guid
+                    });
+                });
 
                 // Set widths between levels based on maxLabelLength.
                 nodes.forEach(function(d) {
@@ -474,11 +546,18 @@ angular.module('dgc.lineage').controller('LineageController', ['$element', '$sco
                 // Enter any new nodes at the parent's previous position.
                 var nodeEnter = node.enter().append("g")
                     .call(dragListener)
-                    .attr("class", "node")
+                    .attr('class', function(d) {
+                        if (d.guid === "root") {
+                            return "hide";
+                        } else {
+                            return "";
+                        }
+                    })
+                    .classed('node', true)
                     .attr("transform", function() {
                         return "translate(" + source.y0 + "," + source.x0 + ")";
-                    })
-                    .on('click', click);
+                    });
+                    //.on('click', click);
 
                 nodeEnter.append("image")
                     .attr("class", "nodeImage")
@@ -490,15 +569,15 @@ angular.module('dgc.lineage').controller('LineageController', ['$element', '$sco
                             tooltip.show(d);
                         }
                     })
-                    .on('mouseout', function(d) {
-                        if (d.type === 'LoadProcess' || 'Table') {
-                            tooltip.hide(d);
-                        }
-                    })
                     .on('dblclick', function(d){ 
                         $state.go("details", {
                             id: d.guid
                         });
+                    })
+                    .on('mouseout', function(d) {
+                        if (d.type === 'LoadProcess' || 'Table') {
+                            tooltip.hide(d);
+                        }
                     })
                     .attr("x", "-18px")
                     .attr("y", "-18px")
@@ -577,13 +656,21 @@ angular.module('dgc.lineage').controller('LineageController', ['$element', '$sco
 
                 // Update the links…
                 var link = svgGroup.selectAll("path.link")
-                    .data(links, function(d) {
-                        return d.target.id;
-                    });
+                    .data(links);
+                // .data(links, function(d) {
+                //     return d.target.id;
+                // });
 
                 // Enter any new links at the parent's previous position.
                 link.enter().insert("path", "g")
-                    .attr("class", "link")
+                    .attr('class', function(d) {
+                        if (d.source.guid === "root") {
+                            return "hide";
+                        } else {
+                            return "";
+                        }
+                    })
+                    .classed('link', true)
                     .style('stroke', 'green')
                     .attr("d", function() {
                         var o = {
@@ -631,12 +718,12 @@ angular.module('dgc.lineage').controller('LineageController', ['$element', '$sco
 
             // Append a group which holds all nodes and which the zoom Listener can act upon.
             var svgGroup = baseSvg.append("g")
-                .attr("transform", "translate(120 ," + heightg / 2 + ")");
+                .attr("transform", "translate(0,0)");
 
             // Define the root
             root = data;
-            root.x0 = viewerHeight / 2;
-            root.y0 = 0;
+            root.x0 = viewerWidth / 2;;
+            root.y0 = viewerHeight / 2;
 
             // Layout the tree initially and center on the root node.
             update(root);
@@ -658,5 +745,6 @@ angular.module('dgc.lineage').controller('LineageController', ['$element', '$sco
                 svgGroup.append("path", "g");
             });
         }
+
     }
 ]);
