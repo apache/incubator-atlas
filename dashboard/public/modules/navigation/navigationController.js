@@ -25,7 +25,7 @@ angular.module('dgc.navigation').controller('NavigationController', ['$scope', '
         $scope.updateVar = function(event) {
             $scope.$$prevSibling.query = angular.element(event.target).text();
 
-        };
+        }; 
 
     }
 ]);

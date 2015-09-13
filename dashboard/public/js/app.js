@@ -75,7 +75,21 @@ angular.module('dgc').factory('lodash', ['$window',
             NotificationService.error(errors);
         }
     }
+
+    $rootScope.$on('$stateChangeSuccess', 
+        function(evt, toState){
+              if(toState.name !== 'search') { 
+               ($('.leftNav').addClass('hide'));
+            }else { 
+                ($('.leftNav').removeClass('hide'));
+            }
+        });
+
+
+
     $rootScope.$on('$stateChangeStart', function() {
         d3.selectAll('.d3-tip').remove();
-    });
+
+      
+     });
 }]);
