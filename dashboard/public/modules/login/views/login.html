@@ -1,0 +1,55 @@
+<!--
+  ~ Licensed to the Apache Software Foundation (ASF) under one
+  ~ or more contributor license agreements.  See the NOTICE file
+  ~ distributed with this work for additional information
+  ~ regarding copyright ownership.  The ASF licenses this file
+  ~ to you under the Apache License, Version 2.0 (the
+  ~ "License"); you may not use this file except in compliance
+  ~ with the License.  You may obtain a copy of the License at
+  ~
+  ~     http://www.apache.org/licenses/LICENSE-2.0
+  ~
+  ~ Unless required by applicable law or agreed to in writing, software
+  ~ distributed under the License is distributed on an "AS IS" BASIS,
+  ~ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  ~ See the License for the specific language governing permissions and
+  ~ limitations under the License.
+  -->
+
+<div class="row vertical-offset-100 login">
+    <div class="col-md-4 col-md-offset-4">
+        <div class="panel panel-default">
+            <div class="panel-heading">
+                <h3 class="panel-title">Login</h3>
+            </div>
+            <div class="panel-body">
+                <form accept-charset="UTF-8" role="form" name="loginForm" ng-submit="loggUser(loginForm)" novalidate>
+                    <fieldset>
+                        <div class="form-group" ng-class="{ 'has-error' : loginForm.name.$invalid && !loginForm.name.$pristine }">
+                            <label for="name">Username</label>
+                            <input class="form-control" placeholder="Username" ng-model="user.username"
+                                   id="name" name="name" type="text"
+                                   ng-required="true"
+                                   ng-keydown="showLoginVal.userPassInvalid = false" autofocus required>
+                            <p ng-show="loginForm.name.$invalid && !loginForm.name.$pristine" class="help-block">Please enter your user name.</p>
+                        </div>
+                        <div class="form-group" ng-class="{ 'has-error' : loginForm.password.$invalid && !loginForm.password.$pristine }">
+                            <label for="Password">Password</label>
+                            <input class="form-control" placeholder="Password" id="Password" name="password" type="password" ng-model="user.password"
+                                   ng-required="true"
+                                   ng-keydown="showLoginVal.userPassInvalid = false" required>
+                            <p ng-show="loginForm.password.$invalid && !loginForm.password.$pristine" class="help-block">Please enter your password.</p>
+                        </div>
+                        <div class="form-group">
+                            <div class="custom-danger" ng-if="showLoginVal.userPassInvalid">
+                                The username/password you have entered is invalid.
+                            </div>
+                        </div>
+                        <input class="btn btn-lg btn-success btn-block" id="login.submit"  type="submit" value="Login">
+                    </fieldset>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+</div>
