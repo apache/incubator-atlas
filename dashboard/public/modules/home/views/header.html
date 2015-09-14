@@ -32,7 +32,15 @@
                 <a data-ui-sref="{{item.state}}">{{item.title}}</a>
             </li>
         </ul>
-        <a  ng-if="!username" class="pull-right menulink" href="https://cwiki.apache.org/confluence/display/ATLAS/Atlas+Home" target="_blank">Help</a>
-        <a  ng-if="!username" class="pull-right menulink" href="javascript:void(0)" ng-click="ShowAbout()">About</a>
+        <div class="dropdown pull-right" ng-if="username">
+            <a id="dropdownMenu1" data-toggle="dropdown">
+                {{username}}<span class="caret"></span>
+            </a>
+            <ul class="dropdown-menu" aria-labelledby="dropdownMenu1">
+                <li ng-if="username"><a href="javascript:void(0)" ng-click="logOut()">Logout</a></li> 
+            </ul>
+        </div>
+        <a class="pull-right menulink" href="https://cwiki.apache.org/confluence/display/ATLAS/Atlas+Home" target="_blank">Help</a>
+        <a class="pull-right menulink" href="javascript:void(0)" ng-click="ShowAbout()">About</a>
     </nav>
 </div>

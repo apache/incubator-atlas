@@ -18,7 +18,7 @@
 
 'use strict';
 
-angular.module('dgc.home').controller('HeaderController', ['$scope', '$modal', function($scope, $modal) {
+angular.module('dgc.home').controller('HeaderController', ['$scope', '$modal', 'Global', '$state', '$rootScope', function($scope, $modal, Global, $state, $rootScope) {
 
     $scope.menu = [];
 
@@ -34,5 +34,11 @@ angular.module('dgc.home').controller('HeaderController', ['$scope', '$modal', f
             controller: 'AboutController',
             size: 'lg'
         });
+    };
+
+    $scope.logOut = function() {
+        Global.unsetUserSession();
+        $rootScope.username = "";
+        $state.transitionTo('login');
     };
 }]);

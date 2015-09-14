@@ -127,3 +127,11 @@ footer.navbar-bottom img {
     padding-left: 10px;
     padding-right: 10px;
 }
+
+.login{
+   margin-top: 20px;
+} 
+ 
+.custom-danger{
+    color: #a94442;
+}

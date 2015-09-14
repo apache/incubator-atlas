@@ -19,11 +19,13 @@
 'use strict';
 
 angular.module('dgc', ['ngCookies',
+    'ngStorage',
     'ngResource',
     'ui.bootstrap',
     'ui.router',
     'dgc.system',
     'dgc.home',
+    'dgc.login',
     'dgc.about',
     'dgc.search',
     'dgc.navigation'
@@ -39,17 +41,47 @@ angular.module('dgc').factory('lodash', ['$window',
     function($window) {
         return $window.d3;
     }
-]).factory('Global', ['$window', '$location',
-    function($window, $location) {
+]).factory('Global', ['$window', '$cookieStore', '$localStorage',
+    function($window, $cookieStore, $localStorage) {
+
         return {
-            user: $location.search()['user.name'],
-            authenticated: !!$window.user,
-            renderErrors: $window.renderErrors
+            setUserSession: function(usrSession, user) {
+                var exp = new Date();
+                exp.setTime(exp.getTime() + (60 * 60 * 1000));
+                $cookieStore.put('usrSession', usrSession, exp);
+                $localStorage[$cookieStore.get('usrSession').sessionId] = user;
+            },
+            unsetUserSession: function() {
+                $cookieStore.remove('usrSession');
+            },
+            getUserSession: function() {
+                var user = "",
+                    authenticated = false;
+                if (angular.isDefined($cookieStore.get('usrSession')) && $cookieStore.get('usrSession') !== null) {
+                    if (angular.isDefined($localStorage[$cookieStore.get('usrSession').sessionId])) {
+                        user = $localStorage[$cookieStore.get('usrSession').sessionId].user;
+                        authenticated = !!$cookieStore.get('usrSession');
+                    }
+                }
+                return {
+                    user: user,
+                    authenticated: authenticated
+                };
+            },
+            getRenderErrors: function() {
+                return $window.renderErrors;
+            }
         };
     }
 ]).factory('HttpInterceptor', ['Global', function(Global) {
     return {
         'request': function(config) {
+            if (!Global.getUserSession().authenticated) { 
+                window.location.href = window.location.origin + "#!/login"; 
+            }   
+            if (!Global.getUserSession().authenticated && config.url.indexOf('/api/atlas') !== -1) {
+                window.location.href = window.location.origin + "#!/login";
+            }
             if (config.url && (config.url.indexOf('api/atlas/') === 0 || config.url.indexOf('/api/atlas/') === 0)) {
                 config.params = config.params || {};
                 config.params['user.name'] = Global.user;
@@ -59,8 +91,14 @@ angular.module('dgc').factory('lodash', ['$window',
     };
 }]).config(['$httpProvider', function($httpProvider) {
     $httpProvider.interceptors.push('HttpInterceptor');
-}]).run(['$rootScope', 'Global', 'NotificationService', 'lodash', 'd3', function($rootScope, Global, NotificationService, lodash, d3) {
-    var errors = Global.renderErrors;
+}]).run(['$rootScope', 'Global', 'NotificationService', 'lodash', 'd3', '$state', '$cookieStore', function($rootScope, Global, NotificationService, lodash, d3, $state, $cookieStore) {
+    var errors = Global.getRenderErrors();
+    var isAuthenticated = Global.getUserSession().authenticated;
+    if (isAuthenticated) {
+        if (angular.isDefined(Global.getUserSession().user)) {
+            $rootScope.username = Global.getUserSession().user;
+        }
+    }
     if (angular.isArray(errors) || angular.isObject(errors)) {
         lodash.forEach(errors, function(err) {
             err = angular.isObject(err) ? err : {
@@ -75,7 +113,36 @@ angular.module('dgc').factory('lodash', ['$window',
             NotificationService.error(errors);
         }
     }
-    $rootScope.$on('$stateChangeStart', function() {
+    $rootScope.$on('$stateChangeStart', function(event, toState, toParams, fromState) {
+        var lastRot = '',
+            lastPrmObj = '',
+            exp = '';
+
+        if (fromState.name !== "" && fromState.url !== "^") {
+            exp = new Date();
+            exp.setTime(exp.getTime() + (60 * 60 * 1000));
+            $cookieStore.put('LastRoute', toState.name, exp);
+            $cookieStore.put('LastRouteParam', toParams, exp);
+        }
+
+        if (toState.name !== 'login' && !Global.getUserSession().authenticated) {
+            event.preventDefault();
+            $state.go('login');
+
+        } else if (toState.name === 'login' && Global.getUserSession().authenticated) {
+            event.preventDefault();
+            lastRot = $cookieStore.get('LastRoute');
+            lastPrmObj = $cookieStore.get('LastRouteParam');
+
+            if (lastRot !== undefined && lastRot !== 'login' && lastRot !== '') {
+                $state.go(lastRot, lastPrmObj);
+                $cookieStore.remove('LastRoute');
+                $cookieStore.remove('LastRouteParam');
+            } else {
+                $state.go('search');
+            }
+        }
         d3.selectAll('.d3-tip').remove();
     });
+
 }]);
