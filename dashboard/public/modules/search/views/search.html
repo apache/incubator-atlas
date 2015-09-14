@@ -17,7 +17,7 @@
   -->
 
 <div class="row mt20px">
-    <form class="col-lg-offset-3 col-lg-9" name="form" novalidate>
+    <form class="col-lg-9" name="form" novalidate>
         <div class="input-group">
             <input type="text" class="form-control" placeholder="Search" data-ng-model="query" required/>
                 <span class="input-group-btn">
@@ -29,10 +29,8 @@
         <div>
             <small class="small-txt">Search: Table, DB, Column</small>
         </div>
-    </form>
-</div>
-<div class="row mt10px">
-    <div class="col-lg-3" data-ng-include="'/modules/navigation/views/navigation.html'"></div>
+    </form> 
+    <!-- <div class="col-lg-3" data-ng-include="'/modules/navigation/views/navigation.html'"></div> -->
     <div class="col-lg-9">
         <div ng-switch on="searchMessage">
             <div ng-switch-when="load-gif" class="search-spinner"><img src="../img/spinner.gif" align="middle" /></div>

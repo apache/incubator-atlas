@@ -25,6 +25,6 @@ angular.module('dgc.search').config(['$stateProvider',
             url: '/search?query',
             templateUrl: '/modules/search/views/search.html',
             controller: 'SearchController'
-        });
+        });  
     }
 ]);
