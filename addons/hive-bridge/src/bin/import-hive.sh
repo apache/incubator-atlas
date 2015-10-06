@@ -77,8 +77,8 @@ done
 TIME=`date +%Y%m%d%H%M%s`
 
 #Add hive conf in classpath
-if [ ! -z "$HIVE_CONF_DIR" ]; then
-    HIVE_CP=$HIVE_CONF_DIR
+if [ ! -z "$HIVE_CONFIG" ]; then
+    HIVE_CP=$HIVE_CONFIG
 elif [ ! -z "$HIVE_HOME" ]; then
     HIVE_CP="$HIVE_HOME/conf"
 elif [ -e /etc/hive/conf ]; then
