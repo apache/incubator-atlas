@@ -24,7 +24,7 @@ import org.testng.annotations.Test;
 /**
  *
  */
-public class MainIT {
+public class AtlasIT {
 
   @Test
   public void testPortSelection () throws Exception {
