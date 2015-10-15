@@ -102,7 +102,7 @@ public class EntityResource {
 
             Response.Status status = Response.Status.NOT_FOUND;
             if (entityDefinition != null) {
-                response.put(AtlasClient.DEFINITION, entityDefinition);
+                response.put(AtlasClient.DEFINITION, new JSONObject(entityDefinition));
                 status = Response.Status.OK;
             } else {
                 response.put(AtlasClient.ERROR,
@@ -148,7 +148,7 @@ public class EntityResource {
 
             Response.Status status = Response.Status.NOT_FOUND;
             if (entityDefinition != null) {
-                response.put(AtlasClient.DEFINITION, entityDefinition);
+                response.put(AtlasClient.DEFINITION, new JSONObject(entityDefinition));
                 status = Response.Status.OK;
             } else {
                 response.put(AtlasClient.ERROR, Servlets.escapeJsonString(String.format("An entity with type={%s}, " +
