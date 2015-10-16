@@ -17,8 +17,8 @@
 PRG="${0}"
 
 while [ -h "${PRG}" ]; do
-  ls=`ls -ld "${PRG}"`
-  link=`expr "$ls" : '.*-> \(.*\)$'`
+  ls=$(ls -ld "${PRG}")
+  link=$(expr "$ls" : '.*-> \(.*\)$')
   if expr "$link" : '/.*' > /dev/null; then
     PRG="$link"
   else
@@ -26,8 +26,8 @@ while [ -h "${PRG}" ]; do
   fi
 done
 
-BASEDIR=`dirname ${PRG}`
-BASEDIR=`cd ${BASEDIR}/..;pwd`
+BASEDIR=$(dirname "${PRG}")
+BASEDIR=$(cd "${BASEDIR}/.." ; pwd)
 
 if [ -z "$METADATA_CONF" ]; then
   METADATA_CONF=${BASEDIR}/conf
@@ -38,17 +38,17 @@ if [ -f "${METADATA_CONF}/atlas-env.sh" ]; then
   . "${METADATA_CONF}/atlas-env.sh"
 fi
 
-if test -z ${JAVA_HOME}
+if test -z "${JAVA_HOME}"
 then
-    JAVA_BIN=`which java`
-    JAR_BIN=`which jar`
+    JAVA_BIN=$(which java)
+    JAR_BIN=$(which jar)
 else
     JAVA_BIN=${JAVA_HOME}/bin/java
     JAR_BIN=${JAVA_HOME}/bin/jar
 fi
 export JAVA_BIN
 
-if [ ! -e $JAVA_BIN ] || [ ! -e $JAR_BIN ]; then
+if [ ! -e "$JAVA_BIN" ] || [ ! -e "$JAR_BIN" ]; then
   echo "$JAVA_BIN and/or $JAR_BIN not found on the system. Please make sure java and jar commands are available."
   exit 1
 fi
@@ -74,7 +74,7 @@ while [[ ${1} =~ ^\-D ]]; do
   JAVA_PROPERTIES="${JAVA_PROPERTIES} ${1}"
   shift
 done
-TIME=`date +%Y%m%d%H%M%s`
+TIME=$(date +%Y%m%d%H%M%s)
 
 #Add hive conf in classpath
 if [ ! -z "$HIVE_CONF_DIR" ]; then
@@ -88,11 +88,11 @@ else
     exit 1
 fi
 export HIVE_CP
-echo Using Hive configuration directory [$HIVE_CP]
+echo "Using Hive configuration directory [$HIVE_CP]"
 echo "Logs for import are in $METADATA_LOG_DIR/import-hive.log"
 
 ${JAVA_BIN} ${JAVA_PROPERTIES} -cp ${HIVE_CP}:${METADATACPPATH} org.apache.atlas.hive.bridge.HiveMetaStoreBridge
 
 RETVAL=$?
-[ $RETVAL -eq 0 ] && echo Hive Data Model imported successfully!!!
-[ $RETVAL -ne 0 ] && echo Failed to import Hive Data Model!!!
+[ $RETVAL -eq 0 ] && echo "Hive Data Model imported successfully!!!"
+[ $RETVAL -ne 0 ] && echo "Failed to import Hive Data Model!!!"
