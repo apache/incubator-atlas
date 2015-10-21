@@ -26,7 +26,21 @@ angular.module('dgc.tags.instance').controller('InstanceTagController', ['$scope
             DetailsResource.get({
                 id: $stateParams.id
             }, function(data) {
-                $scope.traitsList = data.traitNames;
+
+                    angular.forEach(data.traits, function(obj, trait) {
+                        var pair_arr = [];
+                        if (obj.values !== null && Object.keys(obj.values).length > 0) {
+                            angular.forEach(obj.values, function(value, key) {
+                                   var pair = key+":"+value;
+                                   pair_arr.push(pair);                                
+                            });
+                            data.traits[trait].values = pair_arr.join(" | ");
+                        } else {
+                            data.traits[trait].values = 'NA';
+                        }
+                    });
+                
+                $scope.traitsList = data.traits;
             });
         }
         $scope.openAddTag = function() {

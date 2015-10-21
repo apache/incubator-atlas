@@ -31,6 +31,10 @@ angular.module('dgc.tags.definition').controller('DefinitionTagsController', ['$
             $scope.tagModel.attributeDefinitions.push(AttributeDefinition.getModel());
         };
 
+        $scope.removeAttribute = function(index){
+            $scope.tagModel.attributeDefinitions.splice(index,1);
+        };
+
         $scope.categoryChange = function CategorySwitched() {
             $scope.categoryInst = Categories[$scope.category].clearTags();
         };
