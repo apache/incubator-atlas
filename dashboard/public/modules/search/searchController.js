@@ -47,9 +47,9 @@ angular.module('dgc.search').controller('SearchController', ['$scope', '$locatio
                 $scope.totalItems = $scope.resultCount;
                 $scope.transformedResults = {};
                 $scope.dataTransitioned = false;
-                if (response.results.dataType && response.results.dataType.typeName.indexOf('__') === 0) {
+                if (response.dataType && response.dataType.typeName.indexOf('__') === 0) {
                     $scope.dataTransitioned = true;
-                    var attrDef = response.results.dataType.attributeDefinitions;
+                    var attrDef = response.dataType.attributeDefinitions;
                     angular.forEach(attrDef, function(value) {
                         if (value.dataTypeName === '__IdType') {
                             $scope.searchKey = value.name;
@@ -126,7 +126,7 @@ angular.module('dgc.search').controller('SearchController', ['$scope', '$locatio
                         });
                     }
             });
-        }
+        };
         $scope.$on('refreshResourceData', $scope.getResourceDataHome);
         $scope.filterSearchResults = function(items) {
             var res = {};
