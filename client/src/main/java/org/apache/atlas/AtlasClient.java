@@ -18,6 +18,7 @@
 
 package org.apache.atlas;
 
+import com.google.common.collect.ImmutableList;
 import com.sun.jersey.api.client.Client;
 import com.sun.jersey.api.client.ClientResponse;
 import com.sun.jersey.api.client.WebResource;
@@ -26,6 +27,9 @@ import com.sun.jersey.client.urlconnection.URLConnectionClientHandler;
 import org.apache.atlas.security.SecureClientUtils;
 import org.apache.atlas.typesystem.Referenceable;
 import org.apache.atlas.typesystem.json.InstanceSerialization;
+import org.apache.atlas.typesystem.json.TypesSerialization;
+import org.apache.atlas.typesystem.types.*;
+import org.apache.atlas.typesystem.types.utils.TypesUtil;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.lang.StringUtils;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -423,6 +427,57 @@ public class AtlasClient {
         } catch (JSONException e) {
             throw new AtlasServiceException(e);
         }
+    }
+
+    private String createTraitType(String traitname, String supertrait) {
+        if (supertrait == null) {
+            return TypesSerialization.toJson(TypeUtils.getTypesDef(
+                    ImmutableList.<EnumTypeDefinition>of(),
+                    ImmutableList.<StructTypeDefinition>of(),
+                    ImmutableList.of(TypesUtil.createTraitTypeDef(traitname, null)),
+                    ImmutableList.<HierarchicalTypeDefinition<ClassType>>of()));
+        } else {
+            return TypesSerialization.toJson(TypeUtils.getTypesDef(
+                    ImmutableList.<EnumTypeDefinition>of(),
+                    ImmutableList.<StructTypeDefinition>of(),
+                    ImmutableList.of(TypesUtil.createTraitTypeDef(traitname, ImmutableList.of(supertrait))),
+                    ImmutableList.<HierarchicalTypeDefinition<ClassType>>of()));
+
+        }
+    }
+
+    /**
+     * Create a new Trait (not associated with any entity yet)
+     * @param traitName Name of the Trait to be created
+     * @param superTrait Name of the superTrait (Can be null)
+     * @return result JSON object
+     * @throws AtlasServiceException
+     */
+    public JSONObject createTrait(String traitName,String superTrait) throws AtlasServiceException {
+        String traitJSON = createTraitType(traitName, superTrait);
+        return createType(traitJSON);
+    }
+
+    /**
+     * Add Trait to an entity
+     * @param guid Guid of the entity with which trait is to be added
+     * @param traitDefinition json definition of trait
+     * @return result json object
+     * @throws AtlasServiceException
+     */
+    public JSONObject addTrait(String guid, String traitDefinition) throws AtlasServiceException {
+        return callAPI(API.ADD_TRAITS, traitDefinition, guid, "traits");
+    }
+
+    /**
+     * Delete trait from an entity
+     * @param guid GUID of the entity from which trait is to be removed
+     * @param traitName Name of the trait
+     * @return result json object
+     * @throws AtlasServiceException
+     */
+    public JSONObject deleteTrait(String guid,String traitName) throws AtlasServiceException {
+         return callAPI(API.DELETE_TRAITS,null,guid,"traits",traitName);
     }
 
     private WebResource getResource(API api, String... pathParams) {
