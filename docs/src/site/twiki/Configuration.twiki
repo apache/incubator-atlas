@@ -33,9 +33,18 @@ atlas.graph.storage.backend=hbase
 atlas.graph.storage.hostname=<ZooKeeper Quorum>
 </verbatim>
 
+HBASE_CONF_DIR environment variable needs to be set to point to the Hbase client configuration directory which is added to classpath when Atlas starts up.
+hbase-site.xml needs to have the following properties set according to the cluster setup
+<verbatim>
+#Set below to /hbase-secure if the Hbase server is setup in secure mode
+zookeeper.znode.parent=/hbase-unsecure
+</verbatim>
+
 Advanced configuration
 
+# If you are planning to use any of the configs mentioned below, they need to be prefixed with "atlas.graph." to take effect in ATLAS
 Refer http://s3.thinkaurelius.com/docs/titan/0.5.4/titan-config-ref.html#_storage_hbase
+
 
 ---++++ Graph Search Index
 This section sets up the graph db - titan - to use an search indexing system. The example
@@ -73,7 +82,7 @@ atlas.lineage.hive.table.schema.query=hive_table where name=?, columns
 </verbatim>
 
 ---+++ Notification Configs
-Refer http://kafka.apache.org/documentation.html#configuration for kafka configuration. All kafka configs should be prefixed with 'atlas.kafka.'
+Refer http://kafka.apache.org/documentation.html#configuration for Kafka configuration. All Kafka configs should be prefixed with 'atlas.kafka.'
 
 <verbatim>
 atlas.notification.embedded=true
@@ -83,7 +92,15 @@ atlas.kafka.bootstrap.servers=localhost:9027
 atlas.kafka.zookeeper.session.timeout.ms=400
 atlas.kafka.zookeeper.sync.time.ms=20
 atlas.kafka.auto.commit.interval.ms=1000
+atlas.kafka.hook.group.id=atlas
 </verbatim>
+
+Note that Kafka group ids are specified for a specific topic.  The Kafka group id configuration for entity notifications is 'atlas.kafka.entities.group.id'
+
+<verbatim>
+atlas.kafka.entities.group.id=<consumer id>
+</verbatim>
+
 
 ---+++ Client Configs
 <verbatim>

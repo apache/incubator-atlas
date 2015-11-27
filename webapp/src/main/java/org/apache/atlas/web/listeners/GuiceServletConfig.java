@@ -33,9 +33,13 @@ import org.apache.atlas.ApplicationProperties;
 import org.apache.atlas.AtlasClient;
 import org.apache.atlas.AtlasException;
 import org.apache.atlas.RepositoryMetadataModule;
+import org.apache.atlas.notification.NotificationInterface;
 import org.apache.atlas.notification.NotificationModule;
+import org.apache.atlas.notification.entity.NotificationEntityChangeListener;
 import org.apache.atlas.repository.graph.GraphProvider;
 import org.apache.atlas.service.Services;
+import org.apache.atlas.services.MetadataService;
+import org.apache.atlas.typesystem.types.TypeSystem;
 import org.apache.atlas.web.filters.AtlasAuthenticationFilter;
 import org.apache.atlas.web.filters.AuditFilter;
 import org.apache.commons.configuration.Configuration;
@@ -54,7 +58,7 @@ public class GuiceServletConfig extends GuiceServletContextListener {
 
     private static final String GUICE_CTX_PARAM = "guice.packages";
     static final String HTTP_AUTHENTICATION_ENABLED = "atlas.http.authentication.enabled";
-    protected Injector injector;
+    protected volatile Injector injector;
 
     @Override
     protected Injector getInjector() {
@@ -66,6 +70,11 @@ public class GuiceServletConfig extends GuiceServletContextListener {
 		 * .html
 		 */
         if (injector == null) {
+
+            // perform login operations
+            LoginProcessor loginProcessor = new LoginProcessor();
+            loginProcessor.login();
+
             injector = Guice.createInjector(new RepositoryMetadataModule(), new NotificationModule(),
                     new JerseyServletModule() {
                         @Override
@@ -110,10 +119,7 @@ public class GuiceServletConfig extends GuiceServletContextListener {
 
         installLogBridge();
 
-        // perform login operations
-        LoginProcessor loginProcessor = new LoginProcessor();
-        loginProcessor.login();
-
+        initMetadataService();
         startServices();
     }
 
@@ -153,5 +159,18 @@ public class GuiceServletConfig extends GuiceServletContextListener {
         LOG.debug("Stopping services");
         Services services = injector.getInstance(Services.class);
         services.stop();
+    }
+
+    // initialize the metadata service
+    private void initMetadataService() {
+        MetadataService metadataService = injector.getInstance(MetadataService.class);
+
+        // add a listener for entity changes
+        NotificationInterface notificationInterface = injector.getInstance(NotificationInterface.class);
+
+        NotificationEntityChangeListener listener =
+            new NotificationEntityChangeListener(notificationInterface, TypeSystem.getInstance());
+
+        metadataService.registerListener(listener);
     }
 }

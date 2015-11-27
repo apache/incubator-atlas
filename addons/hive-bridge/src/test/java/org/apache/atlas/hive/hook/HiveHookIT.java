@@ -18,12 +18,14 @@
 
 package org.apache.atlas.hive.hook;
 
+import org.apache.atlas.ApplicationProperties;
 import org.apache.atlas.AtlasClient;
 import org.apache.atlas.ParamChecker;
 import org.apache.atlas.hive.bridge.HiveMetaStoreBridge;
 import org.apache.atlas.hive.model.HiveDataModelGenerator;
 import org.apache.atlas.hive.model.HiveDataTypes;
 import org.apache.atlas.typesystem.Referenceable;
+import org.apache.commons.configuration.Configuration;
 import org.apache.commons.lang.RandomStringUtils;
 import org.apache.commons.lang.StringEscapeUtils;
 import org.apache.commons.lang.StringUtils;
@@ -60,7 +62,8 @@ public class HiveHookIT {
         ss = SessionState.start(ss);
         SessionState.setCurrentSessionState(ss);
 
-        dgiCLient = new AtlasClient(DGI_URL);
+        Configuration configuration = ApplicationProperties.get();
+        dgiCLient = new AtlasClient(configuration.getString(HiveMetaStoreBridge.ATLAS_ENDPOINT, DGI_URL));
     }
 
     private void runCommand(String cmd) throws Exception {
@@ -294,7 +297,7 @@ public class HiveHookIT {
         String query = String.format(
                 "%s as t where tableName = '%s', db where name = '%s' and clusterName = '%s'" + " select t",
                 HiveDataTypes.HIVE_TABLE.getName(), tableName.toLowerCase(), dbName.toLowerCase(), CLUSTER_NAME);
-        return assertEntityIsRegistered(query);
+        return assertEntityIsRegistered(query, "t");
     }
 
     private String assertDatabaseIsRegistered(String dbName) throws Exception {
@@ -319,10 +322,10 @@ public class HiveHookIT {
                                + "db where name = '%s' and clusterName = '%s' select p", typeName, value,
                             tableName.toLowerCase(), dbName.toLowerCase(), CLUSTER_NAME);
 
-        assertEntityIsRegistered(dslQuery);
+        assertEntityIsRegistered(dslQuery, "p");
     }
 
-    private String assertEntityIsRegistered(final String query) throws Exception {
+    private String assertEntityIsRegistered(final String query, String... arg) throws Exception {
         waitFor(2000, new Predicate() {
             @Override
             public boolean evaluate() throws Exception {
@@ -331,6 +334,8 @@ public class HiveHookIT {
             }
         });
 
+        String column = (arg.length > 0) ? arg[0] : "_col_0";
+
         JSONArray results = dgiCLient.search(query);
         JSONObject row = results.getJSONObject(0);
         if (row.has("__guid")) {
@@ -338,7 +343,7 @@ public class HiveHookIT {
         } else if (row.has("$id$")) {
             return row.getJSONObject("$id$").getString("id");
         } else {
-            return row.getJSONObject("_col_0").getString("id");
+            return row.getJSONObject(column).getString("id");
         }
     }
 

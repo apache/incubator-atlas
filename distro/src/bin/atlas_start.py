@@ -25,6 +25,8 @@ METADATA_LOG_OPTS="-Datlas.log.dir=%s -Datlas.log.file=application.log"
 METADATA_COMMAND_OPTS="-Datlas.home=%s"
 METADATA_CONFIG_OPTS="-Datlas.conf=%s"
 DEFAULT_JVM_OPTS="-Xmx1024m -XX:MaxPermSize=512m -Dlog4j.configuration=atlas-log4j.xml"
+CONF_FILE="application.properties"
+HBASE_STORAGE_CONF_ENTRY="atlas.graph.storage.backend\s*=\s*hbase"
 
 def main():
 
@@ -50,17 +52,52 @@ def main():
     web_app_dir = mc.webAppDir(metadata_home)
     mc.expandWebApp(metadata_home)
 
+    #add hbase-site.xml to classpath
+    hbase_conf_dir = mc.hbaseConfDir(confdir)
+
     p = os.pathsep
     metadata_classpath = confdir + p \
                        + os.path.join(web_app_dir, "atlas", "WEB-INF", "classes" ) + p \
                        + os.path.join(web_app_dir, "atlas", "WEB-INF", "lib", "*" )  + p \
                        + os.path.join(metadata_home, "libext", "*")
-
+    if os.path.exists(hbase_conf_dir):
+        metadata_classpath = metadata_classpath + p \
+                            + hbase_conf_dir
+    else: 
+       storage_backend = mc.grep(os.path.join(confdir, CONF_FILE), HBASE_STORAGE_CONF_ENTRY)
+       if storage_backend != None:
+	   raise Exception("Could not find hbase-site.xml in %s. Please set env var HBASE_CONF_DIR to the hbase client conf dir", hbase_conf_dir)
+    
     metadata_pid_file = mc.pidFile(metadata_home)
-
+    
+            
     if os.path.isfile(metadata_pid_file):
-        print "%s already exists, exiting" % metadata_pid_file
-        sys.exit()
+       #Check if process listed in atlas.pid file is still running
+       pf = file(metadata_pid_file, 'r')
+       pid = pf.read().strip()
+       pf.close() 
+       
+
+       if  mc.ON_POSIX:
+            
+            if mc.unix_exist_pid((int)(pid)):
+                mc.server_already_running(pid)
+            else:
+                 mc.server_pid_not_running(pid)
+              
+              
+       else:
+            if mc.IS_WINDOWS:
+                if mc.win_exist_pid(pid):
+                   mc.server_already_running(pid)
+                else:
+                     mc.server_pid_not_running(pid)
+                   
+            else:
+                #os other than nt or posix - not supported - need to delete the file to restart server if pid no longer exist
+                mc.server_already_running(pid)
+             
+
 
     args = ["-app", os.path.join(web_app_dir, "atlas")]
     args.extend(sys.argv[1:])
