@@ -32,8 +32,7 @@ public class KafkaNotificationProvider implements Provider<KafkaNotification> {
     public KafkaNotification get() {
         try {
             Configuration applicationProperties = ApplicationProperties.get();
-            KafkaNotification instance = new KafkaNotification(applicationProperties);
-            return instance;
+            return new KafkaNotification(applicationProperties);
         } catch(AtlasException e) {
             throw new RuntimeException(e);
         }
