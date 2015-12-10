@@ -416,6 +416,7 @@
         <module>webapp</module>
         <module>docs</module>
         <module>addons/hive-bridge</module>
+        <module>addons/storm-bridge</module>
         <module>distro</module>
     </modules>
 
