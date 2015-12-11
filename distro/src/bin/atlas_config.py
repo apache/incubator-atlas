@@ -16,21 +16,23 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import getpass
-
 import os
+import re
 import platform
 import subprocess
 from threading import Thread
+from signal import SIGTERM
 import sys
 import time
 import errno
+from re import split
 
 LIB = "lib"
 CONF = "conf"
 LOG="logs"
 WEBAPP="server" + os.sep + "webapp"
 DATA="data"
-ENV_KEYS = ["JAVA_HOME", "METADATA_OPTS", "METADATA_LOG_DIR", "METADATA_PID_DIR", "METADATA_CONF", "METADATACPPATH", "METADATA_DATA_DIR", "METADATA_HOME_DIR", "METADATA_EXPANDED_WEBAPP_DIR"]
+ENV_KEYS = ["JAVA_HOME", "METADATA_OPTS", "METADATA_LOG_DIR", "METADATA_PID_DIR", "METADATA_CONF", "METADATACPPATH", "METADATA_DATA_DIR", "METADATA_HOME_DIR", "METADATA_EXPANDED_WEBAPP_DIR", "HBASE_CONF_DIR"]
 METADATA_CONF = "METADATA_CONF"
 METADATA_LOG = "METADATA_LOG_DIR"
 METADATA_PID = "METADATA_PID_DIR"
@@ -38,6 +40,7 @@ METADATA_WEBAPP = "METADATA_EXPANDED_WEBAPP_DIR"
 METADATA_OPTS = "METADATA_OPTS"
 METADATA_DATA = "METADATA_DATA_DIR"
 METADATA_HOME = "METADATA_HOME_DIR"
+HBASE_CONF_DIR = "HBASE_CONF_DIR"
 IS_WINDOWS = platform.system() == "Windows"
 ON_POSIX = 'posix' in sys.builtin_module_names
 DEBUG = False
@@ -58,6 +61,10 @@ def libDir(dir) :
 def confDir(dir):
     localconf = os.path.join(dir, CONF)
     return os.environ.get(METADATA_CONF, localconf)
+
+def hbaseConfDir(atlasConfDir):
+    parentDir = os.path.dirname(atlasConfDir)
+    return os.environ.get(HBASE_CONF_DIR, os.path.join(parentDir, "hbase", CONF))
 
 def logDir(dir):
     localLog = os.path.join(dir, LOG)
@@ -288,4 +295,45 @@ def writePid(metadata_pid_file, process):
     f.write(str(process.pid))
     f.close()
 
+def unix_exist_pid(pid):    
+    #check if process id exist in the current process table  
+    #See man 2 kill - Linux man page for info about the kill(pid,0) system function    
+    
+    try:
+        os.kill(pid, 0)
+    except OSError as e :
+        
+           return e.errno == errno.EPERM
+       
+    else:
+        return True
 
+
+def win_exist_pid(pid):
+    #The os.kill approach does not work on Windows with python 2.7
+    #the output from tasklist command is searched for the process id
+    
+    command='tasklist /fi  "pid eq '+ pid + '"'
+    sub_process=subprocess.Popen(command, stdout = subprocess.PIPE, shell=False)
+    sub_process.communicate()
+    output = subprocess.check_output(command)
+    output=split(" *",output)
+    for line in output:
+   
+        if pid in line:
+           return True
+
+    return False
+
+def server_already_running(pid):
+    print "Atlas server is already running under process %s" % pid
+    sys.exit()  
+    
+def server_pid_not_running(pid):
+    print "The Server is no longer running with pid %s" %pid
+
+def grep(file, value):
+    for line in open(file).readlines():
+        if re.match(value, line):	
+           return line
+    return None

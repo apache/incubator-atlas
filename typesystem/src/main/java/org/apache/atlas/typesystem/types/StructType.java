@@ -18,11 +18,12 @@
 
 package org.apache.atlas.typesystem.types;
 
-import com.google.common.collect.ImmutableList;
 import org.apache.atlas.AtlasException;
 import org.apache.atlas.typesystem.IStruct;
 import org.apache.atlas.typesystem.ITypedStruct;
 
+import java.nio.charset.Charset;
+import java.security.MessageDigest;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -49,11 +50,11 @@ public class StructType extends AbstractDataType<IStruct> implements IConstructa
         this.handler = null;
     }
 
-    protected StructType(TypeSystem typeSystem, String name, ImmutableList<String> superTypes, AttributeInfo... fields)
+    protected StructType(TypeSystem typeSystem, String name, AttributeInfo... fields)
     throws AtlasException {
         this.typeSystem = typeSystem;
         this.name = name;
-        this.fieldMapping = constructFieldMapping(superTypes, fields);
+        this.fieldMapping = constructFieldMapping(fields);
         infoToNameMap = TypeUtils.buildAttrInfoToNameMap(this.fieldMapping);
         this.numFields = this.fieldMapping.fields.size();
         this.handler = new TypedStructHandler(this);
@@ -68,7 +69,24 @@ public class StructType extends AbstractDataType<IStruct> implements IConstructa
         return name;
     }
 
-    protected FieldMapping constructFieldMapping(ImmutableList<String> superTypes, AttributeInfo... fields)
+    /**
+     * Validate that current definition can be updated with the new definition
+     * @param newType
+     * @return true if the current definition can be updated with the new definition, else false
+     */
+    @Override
+    public void validateUpdate(IDataType newType) throws TypeUpdateException {
+        super.validateUpdate(newType);
+
+        StructType newStructType = (StructType) newType;
+        try {
+            TypeUtils.validateUpdate(fieldMapping, newStructType.fieldMapping);
+        } catch (TypeUpdateException e) {
+            throw new TypeUpdateException(newType, e);
+        }
+    }
+
+    protected FieldMapping constructFieldMapping(AttributeInfo... fields)
     throws AtlasException {
 
         Map<String, AttributeInfo> fieldsMap = new LinkedHashMap<String, AttributeInfo>();
@@ -175,6 +193,24 @@ public class StructType extends AbstractDataType<IStruct> implements IConstructa
     @Override
     public void output(IStruct s, Appendable buf, String prefix) throws AtlasException {
         handler.output(s, buf, prefix);
+    }
+
+    @Override
+    public void updateSignatureHash(MessageDigest digester, Object val) throws AtlasException {
+        if( !(val instanceof  ITypedStruct)) {
+            throw new IllegalArgumentException("Unexpected value type " + val.getClass().getSimpleName() + ". Expected instance of ITypedStruct");
+        }
+        digester.update(getName().getBytes(Charset.forName("UTF-8")));
+
+        if(fieldMapping.fields != null && val != null) {
+            IStruct typedValue = (IStruct) val;
+            for (AttributeInfo aInfo : fieldMapping.fields.values()) {
+                Object attrVal = typedValue.get(aInfo.name);
+                if(attrVal != null) {
+                    aInfo.dataType().updateSignatureHash(digester, attrVal);
+                }
+            }
+        }
     }
 
     public List<String> getNames(AttributeInfo info) {

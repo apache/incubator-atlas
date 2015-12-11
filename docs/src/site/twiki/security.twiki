@@ -42,6 +42,29 @@ The properties for configuring service authentication are:
    * <code>atlas.authentication.keytab</code> - the path to the keytab file.
    * <code>atlas.authentication.principal</code> - the principal to use for authenticating to the KDC.  The principal is generally of the form "user/host@realm".  You may use the '_HOST' token for the hostname and the local hostname will be substituted in by the runtime (e.g. "Atlas/_HOST@EXAMPLE.COM").
 
+Note that when Atlas is configured with HBase as the storage backend in a secure cluster, the graph db (titan) needs sufficient user permissions to be able to create and access an HBase table.  To grant the appropriate permissions see [[Configuration][Graph persistence engine - Hbase]].
+
+---+++ JAAS configuration
+
+When Atlas is configured with HBase as the storage backend in a secure cluster, a JAAS configuration file should be created and specified so that the HBase client can attempt to SASL-authenticate.
+
+   * Create Atlas JAAS configuration file (e.g. /etc/atlas/conf/atlas-jaas.conf).
+
+<verbatim>
+	Client {
+	   com.sun.security.auth.module.Krb5LoginModule required
+	   useKeyTab=true
+	   useTicketCache=false
+	   storeKey=true
+	   doNotPrompt=false
+	   keyTab="<atlas keytab>"
+	   principal="<atlas principal>";
+	};
+</verbatim>
+
+   * Update Atlas METADATA_OPTS to include ‘java.security.auth.login.config’ set to the above Atlas JAAS configuration file.
+      * For example, <code>-Djava.security.auth.login.config=/etc/atlas/conf/atlas-jaas.conf</code>
+
 ---+++ SPNEGO-based HTTP Authentication
 
 HTTP access to the Atlas platform can be secured by enabling the platform's SPNEGO support.  There are currently two supported authentication mechanisms:
@@ -57,7 +80,8 @@ The properties for configuring the SPNEGO support are:
    * <code>atlas.http.authentication.type</code> (simple|kerberos) [default: simple] - the authentication type
    * <code>atlas.http.authentication.kerberos.principal</code> - the web-application Kerberos principal name. The Kerberos principal name must start with "HTTP/...". For example: "HTTP/localhost@LOCALHOST". There is no default value.
    * <code>atlas.http.authentication.kerberos.keytab</code> - the path to the keytab file containing the credentials for the kerberos principal.
-	
+   * <code>atlas.rest.address</code> - <http/https>://<atlas-fqdn>:<atlas port>
+
 For a more detailed discussion of the HTTP authentication mechanism refer to [[http://hadoop.apache.org/docs/stable/hadoop-auth/Configuration.html][Hadoop Auth, Java HTTP SPNEGO 2.6.0 - Server Side Configuration]].  The prefix that document references is "atlas.http.authentication" in the case of the Atlas authentication implementation.
 
 ---+++ Client security configuration

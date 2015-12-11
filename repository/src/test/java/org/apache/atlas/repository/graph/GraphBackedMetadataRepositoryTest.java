@@ -29,13 +29,13 @@ import org.apache.atlas.RepositoryMetadataModule;
 import org.apache.atlas.TestUtils;
 import org.apache.atlas.discovery.graph.GraphBackedDiscoveryService;
 import org.apache.atlas.repository.Constants;
-import org.apache.atlas.repository.EntityNotFoundException;
 import org.apache.atlas.repository.RepositoryException;
 import org.apache.atlas.typesystem.IStruct;
 import org.apache.atlas.typesystem.ITypedReferenceableInstance;
 import org.apache.atlas.typesystem.ITypedStruct;
 import org.apache.atlas.typesystem.Referenceable;
 import org.apache.atlas.typesystem.Struct;
+import org.apache.atlas.typesystem.exception.EntityNotFoundException;
 import org.apache.atlas.typesystem.persistence.Id;
 import org.apache.atlas.typesystem.types.ClassType;
 import org.apache.atlas.typesystem.types.DataTypes;
@@ -131,18 +131,18 @@ public class GraphBackedMetadataRepositoryTest {
         Assert.assertNotNull(entity);
     }
 
-    @Test(expectedExceptions = RepositoryException.class)
+    @Test(expectedExceptions = EntityNotFoundException.class)
     public void testGetEntityDefinitionNonExistent() throws Exception {
         repositoryService.getEntityDefinition("blah");
         Assert.fail();
     }
 
-    @Test
+    @Test(dependsOnMethods = "testSubmitEntity")
     public void testGetEntityList() throws Exception {
         List<String> entityList = repositoryService.getEntityList(TestUtils.ENTITY_TYPE);
         System.out.println("entityList = " + entityList);
         Assert.assertNotNull(entityList);
-        Assert.assertEquals(entityList.size(), 1); // one department
+        Assert.assertTrue(entityList.contains(guid));
     }
 
     @Test
@@ -342,13 +342,13 @@ public class GraphBackedMetadataRepositoryTest {
         }
 
         Id expected = new Id(guid, tableVertex.<Integer>getProperty(Constants.VERSION_PROPERTY_KEY), TestUtils.TABLE_TYPE);
-        Assert.assertEquals(repositoryService.getIdFromVertex(TestUtils.TABLE_TYPE, tableVertex), expected);
+        Assert.assertEquals(GraphHelper.getIdFromVertex(TestUtils.TABLE_TYPE, tableVertex), expected);
     }
 
     @Test(dependsOnMethods = "testCreateEntity")
     public void testGetTypeName() throws Exception {
         Vertex tableVertex = getTableEntityVertex();
-        Assert.assertEquals(repositoryService.getTypeName(tableVertex), TestUtils.TABLE_TYPE);
+        Assert.assertEquals(GraphHelper.getTypeName(tableVertex), TestUtils.TABLE_TYPE);
     }
 
     @Test(dependsOnMethods = "testCreateEntity")
@@ -415,6 +415,9 @@ public class GraphBackedMetadataRepositoryTest {
     public void testBug37860() throws Exception {
         String dslQuery = "hive_table as t where name = 'bar' "
             + "database where name = 'foo' and description = 'foo database' select t";
+
+        TestUtils.dumpGraph(graphProvider.get());
+
         System.out.println("Executing dslQuery = " + dslQuery);
         String jsonResults = discoveryService.searchByDSL(dslQuery);
         Assert.assertNotNull(jsonResults);
@@ -446,6 +449,8 @@ public class GraphBackedMetadataRepositoryTest {
         //but with elasticsearch, doesn't work without sleep. why??
         long sleepInterval = 1000;
 
+        TestUtils.dumpGraph(graphProvider.get());
+
         //person in hr department whose name is john
         Thread.sleep(sleepInterval);
         String response = discoveryService.searchByFullText("john");
@@ -470,6 +475,41 @@ public class GraphBackedMetadataRepositoryTest {
         Assert.assertEquals(results.length(), 1);
         row = (JSONObject) results.get(0);
         Assert.assertEquals(row.get("typeName"), "Person");
+    }
+    
+    @Test(dependsOnMethods = "testSubmitEntity")
+    public void testUpdateEntity_MultiplicityOneNonCompositeReference() throws Exception {
+        ITypedReferenceableInstance john = repositoryService.getEntityDefinition("Person", "name", "John");
+        Id johnGuid = john.getId();
+        ITypedReferenceableInstance max = repositoryService.getEntityDefinition("Person", "name", "Max");
+        String maxGuid = max.getId()._getId();
+        ITypedReferenceableInstance jane = repositoryService.getEntityDefinition("Person", "name", "Jane");
+        Id janeGuid = jane.getId();
+        
+        // Update max's mentor reference to john.
+        ClassType personType = typeSystem.getDataType(ClassType.class, "Person");
+        ITypedReferenceableInstance instance = personType.createInstance(max.getId());
+        instance.set("mentor", johnGuid);
+        repositoryService.updatePartial(instance);
+        
+        // Verify the update was applied correctly - john should now be max's mentor.
+        max = repositoryService.getEntityDefinition(maxGuid);
+        Object object = max.get("mentor");
+        Assert.assertTrue(object instanceof ITypedReferenceableInstance);
+        ITypedReferenceableInstance refTarget = (ITypedReferenceableInstance) object;
+        Assert.assertEquals(refTarget.getId()._getId(), johnGuid._getId());
+
+        // Update max's mentor reference to jane.
+        instance = personType.createInstance(max.getId());
+        instance.set("mentor", janeGuid);
+        repositoryService.updatePartial(instance);
+
+        // Verify the update was applied correctly - jane should now be max's mentor.
+        max = repositoryService.getEntityDefinition(maxGuid);
+        object = max.get("mentor");
+        Assert.assertTrue(object instanceof ITypedReferenceableInstance);
+        refTarget = (ITypedReferenceableInstance) object;
+        Assert.assertEquals(refTarget.getId()._getId(), janeGuid._getId());
     }
 
     private ITypedReferenceableInstance createHiveTableInstance(Referenceable databaseInstance) throws Exception {

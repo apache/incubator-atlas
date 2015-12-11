@@ -18,12 +18,14 @@
 
 package org.apache.atlas.hive.hook;
 
+import org.apache.atlas.ApplicationProperties;
 import org.apache.atlas.AtlasClient;
-import org.apache.atlas.ParamChecker;
+import org.apache.atlas.utils.ParamChecker;
 import org.apache.atlas.hive.bridge.HiveMetaStoreBridge;
 import org.apache.atlas.hive.model.HiveDataModelGenerator;
 import org.apache.atlas.hive.model.HiveDataTypes;
 import org.apache.atlas.typesystem.Referenceable;
+import org.apache.commons.configuration.Configuration;
 import org.apache.commons.lang.RandomStringUtils;
 import org.apache.commons.lang.StringEscapeUtils;
 import org.apache.commons.lang.StringUtils;
@@ -60,7 +62,8 @@ public class HiveHookIT {
         ss = SessionState.start(ss);
         SessionState.setCurrentSessionState(ss);
 
-        dgiCLient = new AtlasClient(DGI_URL);
+        Configuration configuration = ApplicationProperties.get();
+        dgiCLient = new AtlasClient(configuration.getString(HiveMetaStoreBridge.ATLAS_ENDPOINT, DGI_URL));
     }
 
     private void runCommand(String cmd) throws Exception {
@@ -83,7 +86,12 @@ public class HiveHookIT {
         //There should be just one entity per dbname
         runCommand("drop database " + dbName);
         runCommand("create database " + dbName);
-        assertDatabaseIsRegistered(dbName);
+        String dbid = assertDatabaseIsRegistered(dbName);
+
+        //assert on qualified name
+        Referenceable dbEntity = dgiCLient.getEntity(dbid);
+        Assert.assertEquals(dbEntity.get("qualifiedName"), dbName.toLowerCase() + "@" + CLUSTER_NAME);
+
     }
 
     private String dbName() {
@@ -118,8 +126,12 @@ public class HiveHookIT {
         String colName = "col" + random();
         runCommand("create table " + dbName + "." + tableName + "(" + colName + " int, name string)");
         assertTableIsRegistered(dbName, tableName);
+
         //there is only one instance of column registered
-        assertColumnIsRegistered(colName);
+        String colId = assertColumnIsRegistered(colName);
+        Referenceable colEntity = dgiCLient.getEntity(colId);
+        Assert.assertEquals(colEntity.get("qualifiedName"), String.format("%s.%s.%s@%s", dbName.toLowerCase(),
+                tableName.toLowerCase(), colName.toLowerCase(), CLUSTER_NAME));
 
         tableName = createTable();
         String tableId = assertTableIsRegistered(DEFAULT_DB, tableName);
@@ -128,6 +140,7 @@ public class HiveHookIT {
         Assert.assertEquals(tableRef.get(HiveDataModelGenerator.COMMENT), "table comment");
         String entityName = HiveMetaStoreBridge.getTableQualifiedName(CLUSTER_NAME, DEFAULT_DB, tableName);
         Assert.assertEquals(tableRef.get(HiveDataModelGenerator.NAME), entityName);
+        Assert.assertEquals(tableRef.get("name"), "default." + tableName.toLowerCase() + "@" + CLUSTER_NAME);
 
         final Referenceable sdRef = (Referenceable) tableRef.get("sd");
         Assert.assertEquals(sdRef.get(HiveDataModelGenerator.STORAGE_IS_STORED_AS_SUB_DIRS), false);
@@ -186,7 +199,10 @@ public class HiveHookIT {
 
         runCommand(query);
         assertProcessIsRegistered(query);
-        assertPartitionIsRegistered(DEFAULT_DB, insertTableName, "2015-01-01");
+        String partId = assertPartitionIsRegistered(DEFAULT_DB, insertTableName, "2015-01-01");
+        Referenceable partitionEntity = dgiCLient.getEntity(partId);
+        Assert.assertEquals(partitionEntity.get("qualifiedName"),
+                String.format("%s.%s.%s@%s", "default", insertTableName.toLowerCase(), "2015-01-01", CLUSTER_NAME));
     }
 
     private String random() {
@@ -228,7 +244,9 @@ public class HiveHookIT {
         String tableName = createTable();
         String query = "select * from " + tableName;
         runCommand(query);
-        assertProcessIsRegistered(query);
+        String pid = assertProcessIsRegistered(query);
+        Referenceable processEntity = dgiCLient.getEntity(pid);
+        Assert.assertEquals(processEntity.get("name"), query.toLowerCase());
 
         //single entity per query
         query = "SELECT * from " + tableName.toUpperCase();
@@ -262,7 +280,7 @@ public class HiveHookIT {
         assertTableIsNotRegistered(DEFAULT_DB, viewName);
     }
 
-    private void assertProcessIsRegistered(String queryStr) throws Exception {
+    private String assertProcessIsRegistered(String queryStr) throws Exception {
         //        String dslQuery = String.format("%s where queryText = \"%s\"", HiveDataTypes.HIVE_PROCESS.getName(),
         //                normalize(queryStr));
         //        assertEntityIsRegistered(dslQuery, true);
@@ -271,7 +289,7 @@ public class HiveHookIT {
         String gremlinQuery =
                 String.format("g.V.has('__typeName', '%s').has('%s.queryText', \"%s\").toList()", typeName, typeName,
                         normalize(queryStr));
-        assertEntityIsRegistered(gremlinQuery);
+        return assertEntityIsRegistered(gremlinQuery);
     }
 
     private String normalize(String str) {
@@ -294,7 +312,7 @@ public class HiveHookIT {
         String query = String.format(
                 "%s as t where tableName = '%s', db where name = '%s' and clusterName = '%s'" + " select t",
                 HiveDataTypes.HIVE_TABLE.getName(), tableName.toLowerCase(), dbName.toLowerCase(), CLUSTER_NAME);
-        return assertEntityIsRegistered(query);
+        return assertEntityIsRegistered(query, "t");
     }
 
     private String assertDatabaseIsRegistered(String dbName) throws Exception {
@@ -304,25 +322,18 @@ public class HiveHookIT {
         return assertEntityIsRegistered(query);
     }
 
-    private void assertPartitionIsRegistered(String dbName, String tableName, String value) throws Exception {
+    private String assertPartitionIsRegistered(String dbName, String tableName, String value) throws Exception {
         String typeName = HiveDataTypes.HIVE_PARTITION.getName();
-        String dbType = HiveDataTypes.HIVE_DB.getName();
-        String tableType = HiveDataTypes.HIVE_TABLE.getName();
 
         LOG.debug("Searching for partition of {}.{} with values {}", dbName, tableName, value);
-       /*  gremlinQuery = String.format("g.V.has('__typeName', '%s').has('%s.values', ['%s']).as('p')."
-                        + "out('__%s.table').has('%s.tableName', '%s').out('__%s.db').has('%s.name', '%s')"
-                        + ".has('%s.clusterName', '%s').back('p').toList()", typeName, typeName, value, typeName,
-                 tableType, tableName.toLowerCase(), tableType, dbType, dbName.toLowerCase(), dbType, CLUSTER_NAME);
-         */
         String dslQuery = String.format("%s as p where values = ['%s'], table where tableName = '%s', "
                                + "db where name = '%s' and clusterName = '%s' select p", typeName, value,
                             tableName.toLowerCase(), dbName.toLowerCase(), CLUSTER_NAME);
 
-        assertEntityIsRegistered(dslQuery);
+        return assertEntityIsRegistered(dslQuery, "p");
     }
 
-    private String assertEntityIsRegistered(final String query) throws Exception {
+    private String assertEntityIsRegistered(final String query, String... arg) throws Exception {
         waitFor(2000, new Predicate() {
             @Override
             public boolean evaluate() throws Exception {
@@ -331,6 +342,8 @@ public class HiveHookIT {
             }
         });
 
+        String column = (arg.length > 0) ? arg[0] : "_col_0";
+
         JSONArray results = dgiCLient.search(query);
         JSONObject row = results.getJSONObject(0);
         if (row.has("__guid")) {
@@ -338,7 +351,7 @@ public class HiveHookIT {
         } else if (row.has("$id$")) {
             return row.getJSONObject("$id$").getString("id");
         } else {
-            return row.getJSONObject("_col_0").getString("id");
+            return row.getJSONObject(column).getString("id");
         }
     }
 

@@ -38,7 +38,6 @@ import org.apache.atlas.typesystem.types.Multiplicity;
 import org.apache.atlas.typesystem.types.StructTypeDefinition;
 import org.apache.atlas.typesystem.types.TraitType;
 import org.apache.atlas.typesystem.types.TypeSystem;
-import org.apache.atlas.typesystem.types.TypeUtils;
 import org.apache.atlas.typesystem.types.utils.TypesUtil;
 import org.apache.commons.lang.RandomStringUtils;
 import org.testng.Assert;
@@ -114,7 +113,8 @@ public final class TestUtils {
                 createOptionalAttrDef("orgLevel", "OrgLevel"),
                 createOptionalAttrDef("address", "Address"),
                 new AttributeDefinition("department", "Department", Multiplicity.REQUIRED, false, "employees"),
-                new AttributeDefinition("manager", "Manager", Multiplicity.OPTIONAL, false, "subordinates"));
+                new AttributeDefinition("manager", "Manager", Multiplicity.OPTIONAL, false, "subordinates"),
+                new AttributeDefinition("mentor", "Person", Multiplicity.OPTIONAL, false, null));
 
         HierarchicalTypeDefinition<ClassType> managerTypeDef = createClassTypeDef("Manager", ImmutableList.of("Person"),
                 new AttributeDefinition("subordinates", String.format("array<%s>", "Person"), Multiplicity.COLLECTION,
@@ -135,7 +135,11 @@ public final class TestUtils {
         Referenceable jane = new Referenceable("Manager", "SecurityClearance");
         Referenceable johnAddr = new Referenceable("Address");
         Referenceable janeAddr = new Referenceable("Address");
-
+        Referenceable julius = new Referenceable("Manager");
+        Referenceable juliusAddr = new Referenceable("Address");
+        Referenceable max = new Referenceable("Person");
+        Referenceable maxAddr = new Referenceable("Address");
+        
         hrDept.set("name", "hr");
         john.set("name", "John");
         john.set("department", hrDept);
@@ -149,11 +153,26 @@ public final class TestUtils {
         janeAddr.set("city", "Santa Clara");
         jane.set("address", janeAddr);
 
+        julius.set("name", "Julius");
+        julius.set("department", hrDept);
+        juliusAddr.set("street", "Madison Ave");
+        juliusAddr.set("city", "Newtonville");
+        julius.set("address", juliusAddr);
+        julius.set("subordinates", ImmutableList.<Referenceable>of());
+        
+        max.set("name", "Max");
+        max.set("department", hrDept);
+        maxAddr.set("street", "Ripley St");
+        maxAddr.set("city", "Newton");
+        max.set("address", maxAddr);
+        max.set("manager", jane);
+        max.set("mentor", julius);
+        
         john.set("manager", jane);
 
-        hrDept.set("employees", ImmutableList.of(john, jane));
+        hrDept.set("employees", ImmutableList.of(john, jane, julius, max));
 
-        jane.set("subordinates", ImmutableList.of(john));
+        jane.set("subordinates", ImmutableList.of(john, max));
 
         jane.getTrait("SecurityClearance").set("level", 1);
 
@@ -168,6 +187,8 @@ public final class TestUtils {
     public static final String DATABASE_TYPE = "hive_database";
     public static final String DATABASE_NAME = "foo";
     public static final String TABLE_TYPE = "hive_table";
+    public static final String PARTITION_TYPE = "partition_type";
+    public static final String SERDE_TYPE = "serdeType";
     public static final String TABLE_NAME = "bar";
     public static final String CLASSIFICATION = "classification";
     public static final String PII = "PII";
@@ -189,7 +210,8 @@ public final class TestUtils {
 
         StructTypeDefinition structTypeDefinition = new StructTypeDefinition("serdeType",
                 new AttributeDefinition[]{createRequiredAttrDef("name", DataTypes.STRING_TYPE),
-                        createRequiredAttrDef("serde", DataTypes.STRING_TYPE)});
+                        createRequiredAttrDef("serde", DataTypes.STRING_TYPE),
+                        createOptionalAttrDef("description", DataTypes.STRING_TYPE)});
 
         EnumValue values[] = {new EnumValue("MANAGED", 1), new EnumValue("EXTERNAL", 2),};
 
@@ -225,21 +247,23 @@ public final class TestUtils {
                         new AttributeDefinition("parametersMap",
                                 DataTypes.mapTypeName(DataTypes.STRING_TYPE.getName(), DataTypes.STRING_TYPE.getName()),
                                 Multiplicity.OPTIONAL, true, null),
-                        // map of classes - todo - enable this
-                        //                        new AttributeDefinition("columnsMap",
-                        //                                DataTypes.mapTypeName(DataTypes.STRING_TYPE.getName(),
-                        //                                        "column_type"),
-                        //                                Multiplicity.COLLECTION, true, null),
-                        // map of structs   todo - enable this
-                        //                        new AttributeDefinition("partitionsMap",
-                        //                                DataTypes.mapTypeName(DataTypes.STRING_TYPE.getName(),
-                        //                                        "partition_type"),
-                        //                                Multiplicity.COLLECTION, true, null),
+                         //map of classes -
+                        new AttributeDefinition("columnsMap",
+                                                        DataTypes.mapTypeName(DataTypes.STRING_TYPE.getName(),
+                                                                "column_type"),
+                                                        Multiplicity.COLLECTION, true, null),
+                         //map of structs
+                        new AttributeDefinition("partitionsMap",
+                                                        DataTypes.mapTypeName(DataTypes.STRING_TYPE.getName(),
+                                                                "partition_type"),
+                                                        Multiplicity.COLLECTION, true, null),
                         // struct reference
                         new AttributeDefinition("serde1", "serdeType", Multiplicity.OPTIONAL, false, null),
                         new AttributeDefinition("serde2", "serdeType", Multiplicity.OPTIONAL, false, null),
                         // class reference
-                        new AttributeDefinition("database", DATABASE_TYPE, Multiplicity.REQUIRED, true, null));
+                        new AttributeDefinition("database", DATABASE_TYPE, Multiplicity.REQUIRED, false, null),
+                        //class reference as composite
+                        new AttributeDefinition("databaseComposite", DATABASE_TYPE, Multiplicity.OPTIONAL, true, null));
 
         HierarchicalTypeDefinition<TraitType> piiTypeDefinition =
                 createTraitTypeDef(PII, ImmutableList.<String>of());
@@ -252,7 +276,7 @@ public final class TestUtils {
                 createTraitTypeDef("fetl" + CLASSIFICATION, ImmutableList.of(CLASSIFICATION),
                         createRequiredAttrDef("tag", DataTypes.STRING_TYPE));
 
-        return TypeUtils.getTypesDef(ImmutableList.of(enumTypeDefinition),
+        return TypesUtil.getTypesDef(ImmutableList.of(enumTypeDefinition),
                 ImmutableList.of(structTypeDefinition, partitionDefinition),
                 ImmutableList.of(classificationTypeDefinition, fetlClassificationTypeDefinition, piiTypeDefinition),
                 ImmutableList.of(superTypeDefinition, databaseTypeDefinition, columnsDefinition, tableTypeDefinition));

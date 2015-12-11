@@ -24,8 +24,7 @@ import com.sun.jersey.api.client.Client;
 import com.sun.jersey.api.client.ClientResponse;
 import com.sun.jersey.api.client.WebResource;
 import com.sun.jersey.api.client.config.DefaultClientConfig;
-import org.apache.atlas.AtlasClient;
-import org.apache.atlas.ParamChecker;
+import org.apache.atlas.*;
 import org.apache.atlas.typesystem.Referenceable;
 import org.apache.atlas.typesystem.Struct;
 import org.apache.atlas.typesystem.TypesDef;
@@ -42,9 +41,10 @@ import org.apache.atlas.typesystem.types.IDataType;
 import org.apache.atlas.typesystem.types.Multiplicity;
 import org.apache.atlas.typesystem.types.StructTypeDefinition;
 import org.apache.atlas.typesystem.types.TraitType;
-import org.apache.atlas.typesystem.types.TypeUtils;
 import org.apache.atlas.typesystem.types.utils.TypesUtil;
+import org.apache.atlas.utils.ParamChecker;
 import org.apache.atlas.web.util.Servlets;
+import org.apache.commons.configuration.Configuration;
 import org.apache.commons.lang.RandomStringUtils;
 import org.codehaus.jettison.json.JSONArray;
 import org.codehaus.jettison.json.JSONObject;
@@ -64,9 +64,9 @@ import java.util.List;
  */
 public abstract class BaseResourceIT {
 
+    public static final String ATLAS_REST_ADDRESS = "atlas.rest.address";
     protected WebResource service;
     protected AtlasClient serviceClient;
-    public static String baseUrl = "http://localhost:21000/";
     public static final Logger LOG = LoggerFactory.getLogger(BaseResourceIT.class);
 
     @BeforeClass
@@ -74,6 +74,8 @@ public abstract class BaseResourceIT {
 
         DefaultClientConfig config = new DefaultClientConfig();
         Client client = Client.create(config);
+        Configuration configuration = ApplicationProperties.get();
+        String baseUrl = configuration.getString(ATLAS_REST_ADDRESS, "http://localhost:21000/");
         client.resource(UriBuilder.fromUri(baseUrl).build());
 
         service = client.resource(UriBuilder.fromUri(baseUrl).build());
@@ -82,7 +84,11 @@ public abstract class BaseResourceIT {
 
     protected void createType(TypesDef typesDef) throws Exception {
         HierarchicalTypeDefinition<ClassType> sampleType = typesDef.classTypesAsJavaList().get(0);
-        if (serviceClient.getType(sampleType.typeName) == null) {
+        try {
+            serviceClient.getType(sampleType.typeName);
+            LOG.info("Types already exist. Skipping type creation");
+        } catch(AtlasServiceException ase) {
+            //Expected if type doesnt exist
             String typesAsJSON = TypesSerialization.toJson(typesDef);
             createType(typesAsJSON);
         }
@@ -186,7 +192,7 @@ public abstract class BaseResourceIT {
 
         HierarchicalTypeDefinition<TraitType> etlTraitDef = TypesUtil.createTraitTypeDef("ETL", null);
 
-        TypesDef typesDef = TypeUtils.getTypesDef(ImmutableList.of(enumTypeDefinition),
+        TypesDef typesDef = TypesUtil.getTypesDef(ImmutableList.of(enumTypeDefinition),
                 ImmutableList.of(structTypeDefinition),
                 ImmutableList.of(classificationTrait, piiTrait, phiTrait, pciTrait, soxTrait, secTrait, financeTrait,
                         dimTraitDef, factTraitDef, metricTraitDef, etlTraitDef),

@@ -2,13 +2,45 @@ Apache Atlas Release Notes
 ==========================
 
 --trunk - unreleased
+INCOMPATIBLE CHANGES:
 
+ALL CHANGES:
+
+
+--Release 0.6-incubating
 INCOMPATIBLE CHANGES:
 ATLAS-58 Make hive hook reliable (shwethags)
 ATLAS-54 Rename configs in hive hook (shwethags)
 ATLAS-3 Mixed Index creation fails with Date types (sumasai via shwethags)
 
 ALL CHANGES:
+ATLAS-376 UI: Use the Schema API of the backend to populate details for Schema tab (darshankumar89 via sumasai)
+ATLAS-380 Fix ATLAS source artifact generation (sumasai)
+ATLAS-354 Kerberized cluster: quick_start.py fails to add sample data (shwethags)
+ATLAS-47 Entity mutations for complex types (sumasai via shwethags)
+ATLAS-345 UI: Should allow tag addition on any search result that returns a reference-able entity (darshankumar89 via shwethags)
+ATLAS-279 UI not displaying results for certain successful "select" search queries (anilsg via shwethags)
+ATLAS-242 The qualified name for hive entities should be backward compatible (shwethags)
+ATLAS-361 Add validation when index backends are switched in ATLAS configuration (sumasai via shwethags)
+ATLAS-171 Ability to update type definition(shwethags via sumasai)
+ATLAS-352 Improve write performance on type and entity creation with Hbase (sumasai)
+ATLAS-350 Document jaas config details for atlas (tbeerbower via shwethags)
+ATLAS-344 Document HBase permissions for secure cluster (tbeerbower via shwethags)
+ATLAS-335 Kerberized cluster: Atlas fails to come up with hbase as backend (sumasai via shwethags)
+ATLAS-333 atlas_stop.py – script must delete “atlas.pid” file (ndjouhr via sumasai)
+ATLAS-220 Gets on Enum attribute should return EnumValue(yhemanth via sumasai)
+ATLAS-334 Update documentation to reflect copying required atlas file on solr installation (sumasai via shwethags)
+ATLAS-294 Select queries(ex: from DB select DB.name) response contains column names as "_col_x" instead of the actual names requested in the query.(thiyag via sumasai)
+ATLAS-297 KafkaNotificationTest.testSendReceiveMessage fails when atlas-server is running on the same machine (yhemanth via shwethags)
+ATLAS-306 change javadoc generation from 'package' to 'site' phase(jspeidel via sumasai)
+ATLAS-289 updateEntity does not remove existing edge for multiplicity-one reference (dkantor via shwethags)
+ATLAS-300 Need additional integration test coverage for entity notifications (tbeerbower via shwethags)
+ATLAS-304 surefire fails to run tests if maven project directory path has embedded space(dkantor via sumasai)
+ATLAS-301 Atlas Distribution module test is failing (yhemanth via shwethags)
+ATLAS-114 Upgrade hbase client to 1.1.2 (sumasai)
+ATLAS-296 IllegalArgumentException during hive HiveHookIT integration tests (tbeerbower via shwethags)
+ATLAS-158 Provide Atlas Entity Change Notification (tbeerbower via shwethags)
+ATALS-238 atlas_start.py- the Atlas server won’t restart after improper shutdown(ndjouri via sumasai)
 ATLAS-293 UI Requires Internet Access For UI Facelift (darshankumar89 via shwethags)
 ATLAS-292 The artifactId 'dashboard' should be 'atlas-dashboard' in the webapp/pom.xml (ltfxyz via shwethags)
 ATLAS-208 Remove "\n" characters in the REST API json response (patel_satya via shwethags)
