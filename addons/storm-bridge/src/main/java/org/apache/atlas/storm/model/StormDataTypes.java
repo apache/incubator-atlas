@@ -6,9 +6,9 @@
  * to you under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
- * <p/>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p/>
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -16,25 +16,29 @@
  * limitations under the License.
  */
 
-package org.apache.atlas.kafka;
+package org.apache.atlas.storm.model;
 
-import com.google.inject.Provider;
-import com.google.inject.Provides;
-import com.google.inject.Singleton;
-import org.apache.atlas.ApplicationProperties;
-import org.apache.atlas.AtlasException;
-import org.apache.commons.configuration.Configuration;
 
-public class KafkaNotificationProvider implements Provider<KafkaNotification> {
-    @Override
-    @Provides
-    @Singleton
-    public KafkaNotification get() {
-        try {
-            Configuration applicationProperties = ApplicationProperties.get();
-            return new KafkaNotification(applicationProperties);
-        } catch(AtlasException e) {
-            throw new RuntimeException(e);
-        }
+/**
+ * Storm Data Types for model and hook.
+ */
+public enum StormDataTypes {
+
+    // Topology Classes
+    STORM_TOPOLOGY,  // represents the topology containing the DAG
+
+    STORM_NODE,  // base abstraction for producer and processor
+    STORM_SPOUT, // data producer node having only outputs
+    STORM_BOLT,  // data processing node having both inputs and outputs
+
+    // Data Sets
+    KAFKA_TOPIC,  // kafka data set
+    JMS_TOPIC,  // jms data set
+    HBASE_TABLE,  // hbase table data set
+    HDFS_DATA_SET,  // HDFS data set
+    ;
+
+    public String getName() {
+        return name().toLowerCase();
     }
 }

@@ -1,0 +1,149 @@
+---+ Storm Atlas Bridge
+
+---++ Introduction
+
+Apache Storm is a distributed real-time computation system. Storm makes it
+easy to reliably process unbounded streams of data, doing for real-time
+processing what Hadoop did for batch processing. The process is essentially
+a DAG of nodes, which is called *topology*.
+
+Apache Atlas is a metadata repository that enables end-to-end data lineage,
+search and associate business classification.
+
+
+---++ Overview
+
+The goal of this integration is to at minimum push the operational topology
+metadata along with the underlying data source(s), target(s), derivation
+processes and any available business context so Atlas can capture the
+lineage for this topology.
+
+It would also help to support custom user annotations per node in the topology.
+
+There are 2 parts in this process detailed below:
+1.	Data model to represent the concepts in Storm
+2.	Storm Hook to update metadata in Atlas
+
+
+---++ Storm Data Model
+
+A data model is represented as a Type in Atlas. It contains the descriptions
+of various nodes in the topology graph, such as spouts and bolts and the
+corresponding producer and consumer types.
+
+The following types are added in Atlas.
+
+   * storm_topology - represents the coarse-grained topology
+   * storm_spout - Data Producer having outputs, typically Kafka, JMS
+   * storm_bolt - Data Consumer having inputs and outputs, typically Hive, HBase, HDFS, etc.
+   * Following data sets are added - kafka_topic, jms_topic, hbase_table, hdfs_data_set
+
+The data model for each of the types are described below. More details in
+the class definition at org.apache.atlas.storm.model.StormDataModel.
+
+<verbatim>
+        _class(StormDataTypes.STORM_TOPOLOGY.getName, List("Process")) {
+            "id" ~ (string, required, indexed, unique)
+            "name" ~ (string, required, indexed, unique)
+            "description" ~ (string, optional, indexed)
+            "owner" ~ (string, required, indexed)
+            "startTime" ~ long
+            "endTime" ~ long
+            "conf" ~ (map(string, string), optional)
+            "clusterName" ~ (string, optional, indexed)
+
+            // Nodes in the Graph
+            "nodes" ~ (array(StormDataTypes.STORM_NODE.getName), collection, composite)
+        }
+
+        // Base class for DataProducer aka Spouts and
+        // DataProcessor aka Bolts, also links from Topology
+        _class(StormDataTypes.STORM_NODE.getName) {
+            "name" ~ (string, required, indexed)
+            "description" ~ (string, optional, indexed)
+            // fully qualified driver java class name
+            "driverClass" ~ (string, required, indexed)
+            // spout or bolt configuration NVPs
+            "conf" ~ (map(string, string), optional)
+        }
+
+        // Data Producer and hence only outputs
+        _class(StormDataTypes.STORM_SPOUT.getName, List(StormDataTypes.STORM_NODE.getName)) {
+            "outputs" ~ (array(string), collection)
+        }
+
+        // Data Processor and hence both inputs and outputs (inherited from Spout)
+        _class(StormDataTypes.STORM_BOLT.getName, List(StormDataTypes.STORM_SPOUT.getName)) {
+            "inputs" ~ (array(string), collection)
+        }
+
+        // Kafka Data Set
+        _class(StormDataTypes.KAFKA_TOPIC.getName, List("DataSet")) {
+            "name" ~ (string, required, unique, indexed)
+            "topic" ~ (string, required, unique, indexed)
+            "uri" ~ (string, required)
+            "owner" ~ (string, required, indexed)
+        }
+</verbatim>
+
+
+---++ Storm Hook
+
+Atlas needs to be notified when a new topology is registered successfully in
+Storm or when someone changes the definition of an existing topology. Storm
+provides a Hook, backtype.storm.ISubmitterHook at the storm client used to
+submit a storm topology.
+
+Atlas intercepts the hook post execution and extracts the metadata from the
+topology and updates Atlas using the types defined. Atlas implements the
+Storm client hook interface in org.apache.atlas.storm.hook.StormAtlasHook.
+
+
+---++ Limitations
+
+The following apply for the first version of the integration.
+
+   * Only new topology submissions are registered with Atlas
+   * Any lifecycle changes such as () are not reflected in Atlas
+   * Storm does not support *Delete* but does allow changes. The user
+   needs to use the same topology name for any further updates
+
+
+---++ Installation
+
+The Storm Atlas Hook needs to be manually installed in Storm. The hook
+artifacts are available at: $ATLAS_PACKAGE/hook/storm
+
+Atlas hook jars need to be copied to $STORM_HOME/extlib-daemon.
+Replace STORM_HOME with storm installation path.
+
+Restart all daemons after you have installed the atlas hook into Storm.
+
+
+---++ Configuration
+
+---+++ Atlas Configuration
+
+The following needs to be configured in *client.properties* else defaults to *primary*.
+
+<verbatim>
+atlas.cluster.name=name_of_hadoop_cluster
+</verbatim>
+
+---+++ Storm Configuration
+
+The Storm Atlas Hook needs to be configured in Storm client config
+in $STORM_HOME/conf/storm.yaml as:
+
+<verbatim>
+storm.topology.submission.notifier.plugin.class=org.apache.atlas.storm.hook.StormAtlasHook
+</verbatim>
+
+You could also set this up programatically in Storm Config as:
+
+<verbatim>
+    Config stormConf = new Config();
+    ...
+    stormConf.put(Config.STORM_TOPOLOGY_SUBMISSION_NOTIFIER_PLUGIN,
+            org.apache.atlas.storm.hook.StormAtlasHook.class.getName());
+</verbatim>

@@ -21,15 +21,14 @@ package org.apache.atlas.hive.hook;
 
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.inject.Guice;
-import com.google.inject.Inject;
 import com.google.inject.Injector;
 import org.apache.atlas.ApplicationProperties;
 import org.apache.atlas.hive.bridge.HiveMetaStoreBridge;
 import org.apache.atlas.hive.model.HiveDataTypes;
+import org.apache.atlas.hook.AtlasHook;
 import org.apache.atlas.notification.NotificationInterface;
 import org.apache.atlas.notification.NotificationModule;
 import org.apache.atlas.typesystem.Referenceable;
-import org.apache.atlas.typesystem.json.InstanceSerialization;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.lang.StringUtils;
 import org.apache.hadoop.hive.conf.HiveConf;
@@ -47,13 +46,11 @@ import org.apache.hadoop.hive.ql.metadata.Partition;
 import org.apache.hadoop.hive.ql.metadata.Table;
 import org.apache.hadoop.hive.ql.plan.HiveOperation;
 import org.apache.hadoop.security.UserGroupInformation;
-import org.codehaus.jettison.json.JSONArray;
 import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -66,7 +63,7 @@ import java.util.concurrent.TimeUnit;
 /**
  * AtlasHook sends lineage information to the AtlasSever.
  */
-public class HiveHook implements ExecuteWithHookContext {
+public class HiveHook extends AtlasHook implements ExecuteWithHookContext {
 
     private static final Logger LOG = LoggerFactory.getLogger(HiveHook.class);
 
@@ -105,9 +102,6 @@ public class HiveHook implements ExecuteWithHookContext {
         public String queryStr;
         public Long queryStartTime;
     }
-
-    @Inject
-    private static NotificationInterface notifInterface;
 
     private static final HiveConf hiveConf;
 
@@ -149,6 +143,11 @@ public class HiveHook implements ExecuteWithHookContext {
         hiveConf = new HiveConf();
 
         LOG.info("Created Atlas Hook");
+    }
+
+    @Override
+    protected String getNumberOfRetriesPropertyKey() {
+        return HOOK_NUM_RETRIES;
     }
 
     @Override
@@ -255,7 +254,6 @@ public class HiveHook implements ExecuteWithHookContext {
         }
         if (newTable == null) {
             LOG.warn("Failed to deduct new name for " + event.queryStr);
-            return;
         }
     }
 
@@ -309,41 +307,6 @@ public class HiveHook implements ExecuteWithHookContext {
             }
         }
         notifyEntity(entities);
-    }
-
-    private void notifyEntity(Collection<Referenceable> entities) {
-        JSONArray entitiesArray = new JSONArray();
-        for (Referenceable entity : entities) {
-            String entityJson = InstanceSerialization.toJson(entity, true);
-            entitiesArray.put(entityJson);
-        }
-        notifyEntity(entitiesArray);
-    }
-
-    /**
-     * Notify atlas of the entity through message. The entity can be a complex entity with reference to other entities.
-     * De-duping of entities is done on server side depending on the unique attribute on the
-     * @param entities
-     */
-    private void notifyEntity(JSONArray entities) {
-        int maxRetries = atlasProperties.getInt(HOOK_NUM_RETRIES, 3);
-        String message = entities.toString();
-
-        int numRetries = 0;
-        while (true) {
-            try {
-                notifInterface.send(NotificationInterface.NotificationType.HOOK, message);
-                return;
-            } catch(Exception e) {
-                numRetries++;
-                if(numRetries < maxRetries) {
-                    LOG.debug("Failed to notify atlas for entity {}. Retrying", message, e);
-                } else {
-                    LOG.error("Failed to notify atlas for entity {} after {} retries. Quitting", message,
-                            maxRetries, e);
-                }
-            }
-        }
     }
 
     private String normalize(String str) {

@@ -15,6 +15,7 @@ Atlas exposes notification interface and can be used for reliable entity registr
 
 Available bridges are:
    * [[Bridge-Hive][Hive Bridge]]
+   * [[StormAtlasHook][Storm Bridge]]
 
 
 ---++ Notification
