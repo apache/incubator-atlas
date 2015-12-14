@@ -41,8 +41,8 @@ import org.apache.atlas.typesystem.types.IDataType;
 import org.apache.atlas.typesystem.types.Multiplicity;
 import org.apache.atlas.typesystem.types.StructTypeDefinition;
 import org.apache.atlas.typesystem.types.TraitType;
-import org.apache.atlas.typesystem.types.TypeUtils;
 import org.apache.atlas.typesystem.types.utils.TypesUtil;
+import org.apache.atlas.utils.ParamChecker;
 import org.apache.atlas.web.util.Servlets;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.lang.RandomStringUtils;
@@ -84,7 +84,11 @@ public abstract class BaseResourceIT {
 
     protected void createType(TypesDef typesDef) throws Exception {
         HierarchicalTypeDefinition<ClassType> sampleType = typesDef.classTypesAsJavaList().get(0);
-        if (serviceClient.getType(sampleType.typeName) == null) {
+        try {
+            serviceClient.getType(sampleType.typeName);
+            LOG.info("Types already exist. Skipping type creation");
+        } catch(AtlasServiceException ase) {
+            //Expected if type doesnt exist
             String typesAsJSON = TypesSerialization.toJson(typesDef);
             createType(typesAsJSON);
         }
@@ -188,7 +192,7 @@ public abstract class BaseResourceIT {
 
         HierarchicalTypeDefinition<TraitType> etlTraitDef = TypesUtil.createTraitTypeDef("ETL", null);
 
-        TypesDef typesDef = TypeUtils.getTypesDef(ImmutableList.of(enumTypeDefinition),
+        TypesDef typesDef = TypesUtil.getTypesDef(ImmutableList.of(enumTypeDefinition),
                 ImmutableList.of(structTypeDefinition),
                 ImmutableList.of(classificationTrait, piiTrait, phiTrait, pciTrait, soxTrait, secTrait, financeTrait,
                         dimTraitDef, factTraitDef, metricTraitDef, etlTraitDef),

@@ -407,8 +407,10 @@
     <modules>
         <module>common</module>
         <module>typesystem</module>
+        <module>server-api</module>
         <module>notification</module>
         <module>client</module>
+        <module>titan</module>
         <module>repository</module>
         <module>dashboard</module>
         <module>webapp</module>
@@ -925,6 +927,18 @@
 
             <dependency>
                 <groupId>org.apache.atlas</groupId>
+                <artifactId>atlas-titan</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>org.apache.atlas</groupId>
+                <artifactId>atlas-server-api</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>org.apache.atlas</groupId>
                 <artifactId>atlas-repository</artifactId>
                 <version>${project.version}</version>
             </dependency>
@@ -1419,6 +1433,7 @@
                     <reuseForks>false</reuseForks>
                     <forkCount>1</forkCount>
                     <threadCount>5</threadCount>
+                    <redirectTestOutputToFile>true</redirectTestOutputToFile>
                 </configuration>
                 <executions>
                     <execution>
