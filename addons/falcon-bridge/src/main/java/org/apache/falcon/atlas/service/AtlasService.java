@@ -19,6 +19,7 @@
 package org.apache.falcon.atlas.service;
 
 import org.apache.atlas.falcon.hook.FalconHook;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.falcon.FalconException;
 import org.apache.falcon.atlas.Util.EventUtil;
 import org.apache.falcon.atlas.event.FalconEvent;
@@ -26,7 +27,8 @@ import org.apache.falcon.atlas.publisher.FalconEventPublisher;
 import org.apache.falcon.entity.store.ConfigurationStore;
 import org.apache.falcon.entity.v0.Entity;
 import org.apache.falcon.entity.v0.EntityType;
-import org.apache.falcon.entity.v0.process.Process;
+import org.apache.falcon.entity.v0.feed.ClusterType;
+import org.apache.falcon.entity.v0.feed.Feed;
 import org.apache.falcon.service.ConfigurationChangeListener;
 import org.apache.falcon.service.FalconService;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -67,10 +69,18 @@ public class AtlasService implements FalconService, ConfigurationChangeListener 
     public void onAdd(Entity entity) throws FalconException {
         EntityType entityType = entity.getEntityType();
         switch (entityType) {
-            case PROCESS:
-                addProcessEntity((Process) entity, FalconEvent.OPERATION.ADD_PROCESS);
+            case CLUSTER:
+                addEntity(entity, FalconEvent.OPERATION.ADD_CLUSTER);
                 break;
-
+            case PROCESS:
+                addEntity(entity, FalconEvent.OPERATION.ADD_PROCESS);
+                break;
+            case FEED:
+                FalconEvent.OPERATION operation = isReplicationFeed((Feed) entity) ?
+                        FalconEvent.OPERATION.ADD_REPLICATION_FEED :
+                        FalconEvent.OPERATION.ADD_FEED;
+                addEntity(entity, operation);
+                break;
             default:
                 LOG.debug("Entity type not processed " + entityType);
         }
@@ -84,10 +94,18 @@ public class AtlasService implements FalconService, ConfigurationChangeListener 
     public void onChange(Entity oldEntity, Entity newEntity) throws FalconException {
         EntityType entityType = newEntity.getEntityType();
         switch (entityType) {
-            case PROCESS:
-                addProcessEntity((Process) newEntity, FalconEvent.OPERATION.UPDATE_PROCESS);
+            case CLUSTER:
+                addEntity(newEntity, FalconEvent.OPERATION.UPDATE_CLUSTER);
                 break;
-
+            case PROCESS:
+                addEntity(newEntity, FalconEvent.OPERATION.UPDATE_PROCESS);
+                break;
+            case FEED:
+                FalconEvent.OPERATION operation = isReplicationFeed((Feed) newEntity) ?
+                        FalconEvent.OPERATION.UPDATE_REPLICATION_FEED :
+                        FalconEvent.OPERATION.UPDATE_FEED;
+                addEntity(newEntity, operation);
+                break;
             default:
                 LOG.debug("Entity type not processed " + entityType);
         }
@@ -99,8 +117,8 @@ public class AtlasService implements FalconService, ConfigurationChangeListener 
         onAdd(entity);
     }
 
-    private void addProcessEntity(Process entity, FalconEvent.OPERATION operation) throws FalconException {
-        LOG.info("Adding process entity to Atlas: {}", entity.getName());
+    private void addEntity(Entity entity, FalconEvent.OPERATION operation) throws FalconException {
+        LOG.info("Adding {} entity to Atlas: {}", entity.getEntityType().name(), entity.getName());
 
         try {
             String user = entity.getACL() != null ? entity.getACL().getOwner() :
@@ -111,5 +129,21 @@ public class AtlasService implements FalconService, ConfigurationChangeListener 
         } catch (Exception ex) {
             throw new FalconException("Unable to publish data to publisher " + ex.getMessage(), ex);
         }
+    }
+
+    private static boolean isReplicationFeed(final Feed entity) {
+        String srcCluster = null;
+        String tgtCluster = null;
+
+        // Get the clusters
+        for (org.apache.falcon.entity.v0.feed.Cluster feedCluster : entity.getClusters().getClusters()) {
+            if (ClusterType.SOURCE == feedCluster.getType()) {
+                srcCluster = feedCluster.getName();
+            } else if (ClusterType.TARGET == feedCluster.getType()) {
+                tgtCluster = feedCluster.getName();
+            }
+        }
+
+        return StringUtils.isNotBlank(srcCluster) && StringUtils.isNotBlank(tgtCluster);
     }
 }

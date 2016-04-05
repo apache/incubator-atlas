@@ -40,7 +40,14 @@ public class FalconEvent {
     }
 
     public enum OPERATION {
-        ADD_PROCESS, UPDATE_PROCESS
+        ADD_CLUSTER,
+        UPDATE_CLUSTER,
+        ADD_FEED,
+        UPDATE_FEED,
+        ADD_REPLICATION_FEED,
+        UPDATE_REPLICATION_FEED,
+        ADD_PROCESS,
+        UPDATE_PROCESS,
     }
 
     public String getUser() {

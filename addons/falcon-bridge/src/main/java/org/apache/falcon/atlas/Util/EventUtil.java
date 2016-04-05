@@ -26,7 +26,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -55,6 +57,12 @@ public final class EventUtil {
         return keyValueMap;
     }
 
+    public static List<String> convertStringToList(final String text) {
+        if (StringUtils.isBlank(text)) {
+            return null;
+        }
+        return Arrays.asList(text.split(","));
+    }
 
     public static UserGroupInformation getUgi() throws FalconException {
         UserGroupInformation ugi;
