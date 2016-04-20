@@ -57,6 +57,7 @@ import static org.apache.atlas.security.SecurityProperties.TLS_ENABLED;
  */
 public class AtlasClient {
     private static final Logger LOG = LoggerFactory.getLogger(AtlasClient.class);
+
     public static final String NAME = "name";
     public static final String GUID = "GUID";
     public static final String TYPE = "type";
@@ -71,11 +72,16 @@ public class AtlasClient {
     public static final String ROWS = "rows";
     public static final String DATATYPE = "dataType";
 
+    public static final String EVENTS = "events";
+    public static final String START_KEY = "startKey";
+    public static final String NUM_RESULTS = "count";
+
     public static final String BASE_URI = "api/atlas/";
     public static final String ADMIN_VERSION = "admin/version";
     public static final String ADMIN_STATUS = "admin/status";
     public static final String TYPES = "types";
     public static final String URI_ENTITY = "entities";
+    public static final String URI_ENTITY_AUDIT = "audit";
     public static final String URI_SEARCH = "discovery/search";
     public static final String URI_LINEAGE = "lineage/hive/table";
 
@@ -90,6 +96,9 @@ public class AtlasClient {
     public static final String PROCESS_SUPER_TYPE = "Process";
     public static final String REFERENCEABLE_SUPER_TYPE = "Referenceable";
     public static final String REFERENCEABLE_ATTRIBUTE_NAME = "qualifiedName";
+
+    public static final String PROCESS_ATTRIBUTE_INPUTS = "inputs";
+    public static final String PROCESS_ATTRIBUTE_OUTPUTS = "outputs";
 
     public static final String JSON_MEDIA_TYPE = MediaType.APPLICATION_JSON + "; charset=UTF-8";
     public static final String UNKNOWN_STATUS = "Unknown status";
@@ -348,6 +357,9 @@ public class AtlasClient {
         DELETE_ENTITIES(BASE_URI + URI_ENTITY, HttpMethod.DELETE, Response.Status.OK),
         DELETE_ENTITY(BASE_URI + URI_ENTITY, HttpMethod.DELETE, Response.Status.OK),
 
+        //audit operation
+        LIST_ENTITY_AUDIT(BASE_URI + URI_ENTITY, HttpMethod.GET, Response.Status.OK),
+
         //Trait operations
         ADD_TRAITS(BASE_URI + URI_ENTITY, HttpMethod.POST, Response.Status.CREATED),
         DELETE_TRAITS(BASE_URI + URI_ENTITY, HttpMethod.DELETE, Response.Status.OK),
@@ -392,8 +404,14 @@ public class AtlasClient {
      * @throws AtlasServiceException
      */
     public List<String> createType(String typeAsJson) throws AtlasServiceException {
+        LOG.debug("Creating type definition: {}", typeAsJson);
         JSONObject response = callAPI(API.CREATE_TYPE, typeAsJson);
-        return extractResults(response, AtlasClient.TYPES);
+        return extractResults(response, AtlasClient.TYPES, new ExtractOperation<String, JSONObject>() {
+            @Override
+            String extractElement(JSONObject element) throws JSONException {
+                return element.getString(AtlasClient.NAME);
+            }
+        });
     }
 
     /**
@@ -413,8 +431,14 @@ public class AtlasClient {
      * @throws AtlasServiceException
      */
     public List<String> updateType(String typeAsJson) throws AtlasServiceException {
+        LOG.debug("Updating tyep definition: {}", typeAsJson);
         JSONObject response = callAPI(API.UPDATE_TYPE, typeAsJson);
-        return extractResults(response, AtlasClient.TYPES);
+        return extractResults(response, AtlasClient.TYPES, new ExtractOperation<String, JSONObject>() {
+            @Override
+            String extractElement(JSONObject element) throws JSONException {
+                return element.getString(AtlasClient.NAME);
+            }
+        });
     }
 
     /**
@@ -429,7 +453,7 @@ public class AtlasClient {
 
     public List<String> listTypes() throws AtlasServiceException {
         final JSONObject jsonObject = callAPI(API.LIST_TYPES, null);
-        return extractResults(jsonObject, AtlasClient.RESULTS);
+        return extractResults(jsonObject, AtlasClient.RESULTS, new ExtractOperation<String, String>());
     }
 
     public String getType(String typeName) throws AtlasServiceException {
@@ -453,6 +477,7 @@ public class AtlasClient {
      * @throws AtlasServiceException
      */
     public JSONArray createEntity(JSONArray entities) throws AtlasServiceException {
+        LOG.debug("Creating entities: {}", entities);
         JSONObject response = callAPI(API.CREATE_ENTITY, entities.toString());
         try {
             return response.getJSONArray(GUID);
@@ -501,6 +526,7 @@ public class AtlasClient {
 
     public JSONArray updateEntities(Collection<Referenceable> entities) throws AtlasServiceException {
         JSONArray entitiesArray = getEntitiesArray(entities);
+        LOG.debug("Updating entities: {}", entitiesArray);
         JSONObject response = callAPI(API.UPDATE_ENTITY, entitiesArray.toString());
         try {
             return response.getJSONArray(GUID);
@@ -517,6 +543,7 @@ public class AtlasClient {
      * @param value     property value
      */
     public void updateEntityAttribute(final String guid, final String attribute, String value) throws AtlasServiceException {
+        LOG.debug("Updating entity id: {}, attribute name: {}, attribute value: {}", guid, attribute, value);
         callAPIWithRetries(API.UPDATE_ENTITY_PARTIAL, value, new ResourceCreator() {
             @Override
             public WebResource createResource() {
@@ -534,7 +561,7 @@ public class AtlasClient {
         for (int i = 0; i < getNumberOfRetries(); i++) {
             WebResource resource = resourceCreator.createResource();
             try {
-                LOG.info("using resource {} for {} times", resource.getURI(), i);
+                LOG.debug("Using resource {} for {} times", resource.getURI(), i);
                 JSONObject result = callAPIWithResource(api, resource, requestObject);
                 return result;
             } catch (ClientHandlerException che) {
@@ -557,6 +584,7 @@ public class AtlasClient {
      */
     public void updateEntity(String guid, Referenceable entity) throws AtlasServiceException {
         String entityJson = InstanceSerialization.toJson(entity, true);
+        LOG.debug("Updating entity id {} with {}", guid, entityJson);
         callAPI(API.UPDATE_ENTITY_PARTIAL, entityJson, guid);
     }
 
@@ -608,7 +636,7 @@ public class AtlasClient {
                 return resource;
             }
         });
-        return extractResults(jsonResponse, GUID);
+        return extractResults(jsonResponse, GUID, new ExtractOperation<String, String>());
     }
 
     /**
@@ -618,14 +646,15 @@ public class AtlasClient {
      * @param uniqueAttributeValue Attribute Value that uniquely identifies the entity
      * @return List of deleted entity guids(including composite references from that entity)
      */
-    public List<String> deleteEntity(String entityType, String uniqueAttributeName, String uniqueAttributeValue) throws AtlasServiceException {
+    public List<String> deleteEntity(String entityType, String uniqueAttributeName, String uniqueAttributeValue)
+            throws AtlasServiceException {
         API api = API.DELETE_ENTITY;
         WebResource resource = getResource(api);
         resource = resource.queryParam(TYPE, entityType);
         resource = resource.queryParam(ATTRIBUTE_NAME, uniqueAttributeName);
         resource = resource.queryParam(ATTRIBUTE_VALUE, uniqueAttributeValue);
         JSONObject jsonResponse = callAPIWithResource(API.DELETE_ENTITIES, resource, null);
-        return extractResults(jsonResponse, GUID);
+        return extractResults(jsonResponse, GUID, new ExtractOperation<String, String>());
     }
 
     /**
@@ -695,25 +724,66 @@ public class AtlasClient {
                 return resource;
             }
         });
-        return extractResults(jsonResponse, AtlasClient.RESULTS);
+        return extractResults(jsonResponse, AtlasClient.RESULTS, new ExtractOperation<String, String>());
     }
 
-    private List<String> extractResults(JSONObject jsonResponse, String key) throws AtlasServiceException {
+    private class ExtractOperation<T, U> {
+        T extractElement(U element) throws JSONException {
+            return (T) element;
+        }
+    }
+
+    private <T, U> List<T> extractResults(JSONObject jsonResponse, String key, ExtractOperation<T, U> extractInterafce)
+            throws AtlasServiceException {
         try {
             JSONArray results = jsonResponse.getJSONArray(key);
-            ArrayList<String> resultsList = new ArrayList<>();
+            ArrayList<T> resultsList = new ArrayList<>();
             for (int index = 0; index < results.length(); index++) {
                 Object element = results.get(index);
-                if (element instanceof String) {
-                    resultsList.add((String) element);
-                } else if (element instanceof JSONObject) {
-                    resultsList.add(((JSONObject) element).getString(AtlasClient.NAME));
-                }
+                resultsList.add(extractInterafce.extractElement((U) element));
             }
             return resultsList;
         } catch (JSONException e) {
             throw new AtlasServiceException(e);
         }
+    }
+
+    /**
+     * Get the latest numResults entity audit events in decreasing order of timestamp for the given entity id
+     * @param entityId entity id
+     * @param numResults number of results to be returned
+     * @return list of audit events for the entity id
+     * @throws AtlasServiceException
+     */
+    public List<EntityAuditEvent> getEntityAuditEvents(String entityId, short numResults)
+            throws AtlasServiceException {
+        return getEntityAuditEvents(entityId, null, numResults);
+    }
+
+    /**
+     * Get the entity audit events in decreasing order of timestamp for the given entity id
+     * @param entityId entity id
+     * @param startKey key for the first event to be returned, used for pagination
+     * @param numResults number of results to be returned
+     * @return list of audit events for the entity id
+     * @throws AtlasServiceException
+     */
+    public List<EntityAuditEvent> getEntityAuditEvents(String entityId, String startKey, short numResults)
+            throws AtlasServiceException {
+        WebResource resource = getResource(API.LIST_ENTITY_AUDIT, entityId, URI_ENTITY_AUDIT);
+        if (StringUtils.isNotEmpty(startKey)) {
+            resource = resource.queryParam(START_KEY, startKey);
+        }
+        resource = resource.queryParam(NUM_RESULTS, String.valueOf(numResults));
+
+        JSONObject jsonResponse = callAPIWithResource(API.LIST_ENTITY_AUDIT, resource, null);
+        return extractResults(jsonResponse, AtlasClient.EVENTS, new ExtractOperation<EntityAuditEvent, JSONObject>() {
+            @Override
+            EntityAuditEvent extractElement(JSONObject element) throws JSONException {
+                return EntityAuditEvent.GSON.fromJson(element.toString(), EntityAuditEvent.class);
+            }
+        });
+
     }
 
     /**
@@ -841,6 +911,7 @@ public class AtlasClient {
             clientResponse = resource.accept(JSON_MEDIA_TYPE).type(JSON_MEDIA_TYPE)
                 .method(api.getMethod(), ClientResponse.class, requestObject);
 
+            LOG.debug("API {} returned status {}", resource.getURI(), clientResponse.getStatus());
             if (clientResponse.getStatus() == api.getExpectedStatus().getStatusCode()) {
                 String responseAsString = clientResponse.getEntity(String.class);
                 try {

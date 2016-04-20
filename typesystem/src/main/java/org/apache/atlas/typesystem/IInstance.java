@@ -37,4 +37,5 @@ public interface IInstance {
 
     Map<String, Object> getValuesMap() throws AtlasException;
 
+    String toShortString();
 }

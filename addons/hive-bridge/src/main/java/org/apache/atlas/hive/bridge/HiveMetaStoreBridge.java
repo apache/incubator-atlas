@@ -18,17 +18,19 @@
 
 package org.apache.atlas.hive.bridge;
 
-import com.google.common.base.Joiner;
 import com.sun.jersey.api.client.ClientResponse;
 import org.apache.atlas.ApplicationProperties;
 import org.apache.atlas.AtlasClient;
 import org.apache.atlas.AtlasConstants;
 import org.apache.atlas.AtlasServiceException;
+import org.apache.atlas.fs.model.FSDataModel;
+import org.apache.atlas.fs.model.FSDataTypes;
 import org.apache.atlas.hive.model.HiveDataModelGenerator;
 import org.apache.atlas.hive.model.HiveDataTypes;
 import org.apache.atlas.typesystem.Referenceable;
 import org.apache.atlas.typesystem.Struct;
 import org.apache.atlas.typesystem.json.InstanceSerialization;
+import org.apache.atlas.typesystem.json.TypesSerialization;
 import org.apache.commons.configuration.Configuration;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.metastore.api.Database;
@@ -48,6 +50,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
 
 /**
@@ -61,25 +64,21 @@ public class HiveMetaStoreBridge {
     public static final String DESCRIPTION_ATTR = "description";
     public static final String TABLE_TYPE_ATTR = "tableType";
     public static final String SEARCH_ENTRY_GUID_ATTR = "__guid";
-    public static final String LAST_ACCESS_TIME_ATTR = "lastAccessTime";
 
     private final String clusterName;
+    public static final int MILLIS_CONVERT_FACTOR = 1000;
 
     public static final String ATLAS_ENDPOINT = "atlas.rest.address";
 
     private static final Logger LOG = LoggerFactory.getLogger(HiveMetaStoreBridge.class);
 
     public final Hive hiveClient;
-    private final AtlasClient atlasClient;
+    private AtlasClient atlasClient = null;
 
-    /**
-     * Construct a HiveMetaStoreBridge.
-     * @param hiveConf {@link HiveConf} for Hive component in the cluster
-     * @param atlasConf {@link Configuration} for Atlas component in the cluster
-     * @throws Exception
-     */
-    public HiveMetaStoreBridge(HiveConf hiveConf, Configuration atlasConf) throws Exception {
-        this(hiveConf, atlasConf, null, null);
+    HiveMetaStoreBridge(String clusterName, Hive hiveClient, AtlasClient atlasClient) {
+        this.clusterName = clusterName;
+        this.hiveClient = hiveClient;
+        this.atlasClient = atlasClient;
     }
 
     public String getClusterName() {
@@ -89,31 +88,20 @@ public class HiveMetaStoreBridge {
     /**
      * Construct a HiveMetaStoreBridge.
      * @param hiveConf {@link HiveConf} for Hive component in the cluster
-     * @param doAsUser The user accessing Atlas service
-     * @param ugi {@link UserGroupInformation} representing the Atlas service
      */
-    public HiveMetaStoreBridge(HiveConf hiveConf, Configuration atlasConf, String doAsUser,
-                               UserGroupInformation ugi) throws Exception {
-        this(hiveConf.get(HIVE_CLUSTER_NAME, DEFAULT_CLUSTER_NAME),
-                Hive.get(hiveConf),
-                atlasConf, doAsUser, ugi);
+    public HiveMetaStoreBridge(HiveConf hiveConf) throws Exception {
+        this(hiveConf.get(HIVE_CLUSTER_NAME, DEFAULT_CLUSTER_NAME), Hive.get(hiveConf), null);
     }
 
-    HiveMetaStoreBridge(String clusterName, Hive hiveClient,
-                        Configuration atlasConf, String doAsUser, UserGroupInformation ugi) {
-        this.clusterName = clusterName;
-        this.hiveClient = hiveClient;
-        String baseUrls = atlasConf.getString(ATLAS_ENDPOINT, DEFAULT_DGI_URL);
-        this.atlasClient = new AtlasClient(ugi, doAsUser, baseUrls.split(","));
+    /**
+     * Construct a HiveMetaStoreBridge.
+     * @param hiveConf {@link HiveConf} for Hive component in the cluster
+     */
+    public HiveMetaStoreBridge(HiveConf hiveConf, AtlasClient atlasClient) throws Exception {
+        this(hiveConf.get(HIVE_CLUSTER_NAME, DEFAULT_CLUSTER_NAME), Hive.get(hiveConf), atlasClient);
     }
 
-    HiveMetaStoreBridge(String clusterName, Hive hiveClient, AtlasClient atlasClient) {
-        this.clusterName = clusterName;
-        this.hiveClient = hiveClient;
-        this.atlasClient = atlasClient;
-    }
-
-    private AtlasClient getAtlasClient() {
+    AtlasClient getAtlasClient() {
         return atlasClient;
     }
 
@@ -193,7 +181,7 @@ public class HiveMetaStoreBridge {
 
         String entityJSON = InstanceSerialization.toJson(referenceable, true);
         LOG.debug("Submitting new entity {} = {}", referenceable.getTypeName(), entityJSON);
-        JSONArray guids = atlasClient.createEntity(entityJSON);
+        JSONArray guids = getAtlasClient().createEntity(entityJSON);
         LOG.debug("created instance for type " + typeName + ", guid: " + guids);
 
         return new Referenceable(guids.getString(0), referenceable.getTypeName(), null);
@@ -306,7 +294,7 @@ public class HiveMetaStoreBridge {
     }
 
     private Referenceable createOrUpdateTableInstance(Referenceable dbReference, Referenceable tableReference,
-                                                      Table hiveTable) throws Exception {
+                                                      final Table hiveTable) throws Exception {
         LOG.info("Importing objects from {}.{}", hiveTable.getDbName(), hiveTable.getTableName());
 
         if (tableReference == null) {
@@ -317,8 +305,21 @@ public class HiveMetaStoreBridge {
         tableReference.set(HiveDataModelGenerator.TABLE_NAME, hiveTable.getTableName().toLowerCase());
         tableReference.set("owner", hiveTable.getOwner());
 
-        tableReference.set("createTime", hiveTable.getMetadata().getProperty(hive_metastoreConstants.DDL_TIME));
-        tableReference.set("lastAccessTime", hiveTable.getLastAccessTime());
+        Date createDate = new Date();
+        if (hiveTable.getMetadata().getProperty(hive_metastoreConstants.DDL_TIME) != null){
+            try {
+                createDate = new Date(Long.parseLong(hiveTable.getMetadata().getProperty(hive_metastoreConstants.DDL_TIME)) * MILLIS_CONVERT_FACTOR);
+                tableReference.set(HiveDataModelGenerator.CREATE_TIME, createDate);
+            } catch(NumberFormatException ne) {
+                LOG.error("Error while updating createTime for the table {} ", hiveTable.getCompleteName(), ne);
+            }
+        }
+
+        Date lastAccessTime = createDate;
+        if ( hiveTable.getLastAccessTime() > 0) {
+            lastAccessTime = new Date(hiveTable.getLastAccessTime() * MILLIS_CONVERT_FACTOR);
+        }
+        tableReference.set(HiveDataModelGenerator.LAST_ACCESS_TIME, lastAccessTime);
         tableReference.set("retention", hiveTable.getRetention());
 
         tableReference.set(HiveDataModelGenerator.COMMENT, hiveTable.getParameters().get(HiveDataModelGenerator.COMMENT));
@@ -328,8 +329,8 @@ public class HiveMetaStoreBridge {
 
         tableReference.set(HiveDataModelGenerator.COLUMNS, getColumns(hiveTable.getCols(), tableQualifiedName));
 
-        // add reference to the StorageDescriptorx
-        Referenceable sdReferenceable = fillStorageDescStruct(hiveTable.getSd(), tableQualifiedName, tableQualifiedName);
+        // add reference to the StorageDescriptor
+        Referenceable sdReferenceable = fillStorageDesc(hiveTable.getSd(), tableQualifiedName, getStorageDescQFName(tableQualifiedName));
         tableReference.set("sd", sdReferenceable);
 
         // add reference to the Partition Keys
@@ -348,7 +349,12 @@ public class HiveMetaStoreBridge {
 
         tableReference.set(TABLE_TYPE_ATTR, hiveTable.getTableType().name());
         tableReference.set("temporary", hiveTable.isTemporary());
+
         return tableReference;
+    }
+
+    private String getStorageDescQFName(String entityQualifiedName) {
+        return entityQualifiedName + "_storage";
     }
 
     private Referenceable registerTable(Referenceable dbReference, Table table) throws Exception {
@@ -402,7 +408,7 @@ public class HiveMetaStoreBridge {
         return new Referenceable(sd.getId().id, sd.getTypeName(), null);
     }
 
-    public Referenceable fillStorageDescStruct(StorageDescriptor storageDesc, String tableQualifiedName,
+    public Referenceable fillStorageDesc(StorageDescriptor storageDesc, String tableQualifiedName,
         String sdQualifiedName) throws Exception {
         LOG.debug("Filling storage descriptor information for " + storageDesc);
 
@@ -453,11 +459,22 @@ public class HiveMetaStoreBridge {
         return sdReferenceable;
     }
 
+    public Referenceable fillHDFSDataSet(String pathUri) {
+        Referenceable ref = new Referenceable(FSDataTypes.HDFS_PATH().toString());
+        ref.set("path", pathUri);
+//        Path path = new Path(pathUri);
+//        ref.set("name", path.getName());
+        //TODO - Fix after ATLAS-542 to shorter Name
+        ref.set("name", pathUri);
+        ref.set(AtlasClient.REFERENCEABLE_ATTRIBUTE_NAME, pathUri);
+        return ref;
+    }
+
     public static String getColumnQualifiedName(final String tableQualifiedName, final String colName) {
         final String[] parts = tableQualifiedName.split("@");
         final String tableName = parts[0];
         final String clusterName = parts[1];
-        return String.format("%s.%s@%s", tableName, colName, clusterName);
+        return String.format("%s.%s@%s", tableName, colName.toLowerCase(), clusterName);
     }
 
     public List<Referenceable> getColumns(List<FieldSchema> schemaList, String tableQualifiedName) throws Exception {
@@ -488,6 +505,21 @@ public class HiveMetaStoreBridge {
         AtlasClient dgiClient = getAtlasClient();
 
         try {
+            dgiClient.getType(FSDataTypes.HDFS_PATH().toString());
+            LOG.info("HDFS data model is already registered!");
+        } catch(AtlasServiceException ase) {
+            if (ase.getStatus() == ClientResponse.Status.NOT_FOUND) {
+                //Trigger val definition
+                FSDataModel.main(null);
+
+                final String hdfsModelJson = TypesSerialization.toJson(FSDataModel.typesDef());
+                //Expected in case types do not exist
+                LOG.info("Registering HDFS data model : " + hdfsModelJson);
+                dgiClient.createType(hdfsModelJson);
+            }
+        }
+
+        try {
             dgiClient.getType(HiveDataTypes.HIVE_PROCESS.getName());
             LOG.info("Hive data model is already registered!");
         } catch(AtlasServiceException ase) {
@@ -501,7 +533,11 @@ public class HiveMetaStoreBridge {
 
     public static void main(String[] argv) throws Exception {
         Configuration atlasConf = ApplicationProperties.get();
-        HiveMetaStoreBridge hiveMetaStoreBridge = new HiveMetaStoreBridge(new HiveConf(), atlasConf);
+        String atlasEndpoint = atlasConf.getString(ATLAS_ENDPOINT, DEFAULT_DGI_URL);
+        UserGroupInformation ugi = UserGroupInformation.getCurrentUser();
+        AtlasClient atlasClient = new AtlasClient(atlasEndpoint, ugi, ugi.getShortUserName());
+
+        HiveMetaStoreBridge hiveMetaStoreBridge = new HiveMetaStoreBridge(new HiveConf(), atlasClient);
         hiveMetaStoreBridge.registerHiveDataModel();
         hiveMetaStoreBridge.importHiveMetadata();
     }

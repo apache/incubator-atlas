@@ -20,12 +20,15 @@ package org.apache.atlas.web.resources;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
+import com.google.gson.Gson;
+import com.google.gson.JsonSyntaxException;
 import com.google.inject.Inject;
 import com.sun.jersey.api.client.ClientResponse;
 import com.sun.jersey.api.client.WebResource;
 
 import org.apache.atlas.AtlasClient;
 import org.apache.atlas.AtlasServiceException;
+import org.apache.atlas.EntityAuditEvent;
 import org.apache.atlas.notification.NotificationConsumer;
 import org.apache.atlas.notification.NotificationInterface;
 import org.apache.atlas.notification.NotificationModule;
@@ -49,6 +52,7 @@ import org.apache.atlas.typesystem.types.utils.TypesUtil;
 import org.apache.atlas.web.util.Servlets;
 import org.apache.commons.lang.RandomStringUtils;
 import org.codehaus.jettison.json.JSONArray;
+import org.codehaus.jettison.json.JSONException;
 import org.codehaus.jettison.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -146,6 +150,7 @@ public class EntityJerseyResourceIT extends BaseResourceIT {
         db.set("description", randomString());
 
         final String dbid = serviceClient.createEntity(db).getString(0);
+        assertEntityAudit(dbid, EntityAuditEvent.EntityAuditAction.ENTITY_CREATE);
 
         waitForNotification(notificationConsumer, MAX_WAIT_TIME, new NotificationPredicate() {
             @Override
@@ -185,6 +190,17 @@ public class EntityJerseyResourceIT extends BaseResourceIT {
         serviceClient.createEntity(table);
         results = serviceClient.searchByDSL(String.format("%s where name='%s'", DATABASE_TYPE, dbName));
         assertEquals(results.length(), 1);
+    }
+
+    private void assertEntityAudit(String dbid, EntityAuditEvent.EntityAuditAction auditAction)
+            throws Exception {
+        List<EntityAuditEvent> events = serviceClient.getEntityAuditEvents(dbid, (short) 100);
+        for (EntityAuditEvent event : events) {
+            if (event.getAction() == auditAction) {
+                return;
+            }
+        }
+        fail("Expected audit event with action = " + auditAction);
     }
 
     @Test
@@ -355,12 +371,17 @@ public class EntityJerseyResourceIT extends BaseResourceIT {
     }
 
     private String getEntityDefinition(ClientResponse clientResponse) throws Exception {
-        Assert.assertEquals(clientResponse.getStatus(), Response.Status.OK.getStatusCode());
-        JSONObject response = new JSONObject(clientResponse.getEntity(String.class));
+        JSONObject response = getEntity(clientResponse);
         final String definition = response.getString(AtlasClient.DEFINITION);
         Assert.assertNotNull(definition);
 
         return definition;
+    }
+
+    private JSONObject getEntity(ClientResponse clientResponse) throws JSONException {
+        Assert.assertEquals(clientResponse.getStatus(), Response.Status.OK.getStatusCode());
+        JSONObject response = new JSONObject(clientResponse.getEntity(String.class));
+        return response;
     }
 
     @Test
@@ -478,6 +499,8 @@ public class EntityJerseyResourceIT extends BaseResourceIT {
         JSONObject response = new JSONObject(responseAsString);
         Assert.assertNotNull(response.get(AtlasClient.REQUEST_ID));
         Assert.assertNotNull(response.get(AtlasClient.GUID));
+
+        assertEntityAudit(guid, EntityAuditEvent.EntityAuditAction.TAG_ADD);
     }
 
     @Test(dependsOnMethods = "testAddTrait")
@@ -576,6 +599,7 @@ public class EntityJerseyResourceIT extends BaseResourceIT {
         Assert.assertNotNull(response.get(AtlasClient.REQUEST_ID));
         Assert.assertNotNull(response.get("GUID"));
         Assert.assertNotNull(response.get("traitName"));
+        assertEntityAudit(guid, EntityAuditEvent.EntityAuditAction.TAG_DELETE);
     }
 
     @Test
@@ -714,18 +738,45 @@ public class EntityJerseyResourceIT extends BaseResourceIT {
         columns.add(ref1);
         columns.add(ref2);
         tableInstance.set("columns", columns);
-
+        String entityJson = InstanceSerialization.toJson(tableInstance, true);
+        JSONArray entityArray = new JSONArray(1);
+        entityArray.put(entityJson);
         LOG.debug("Replacing entity= " + tableInstance);
-        serviceClient.updateEntities(tableInstance);
+        ClientResponse clientResponse = service.path(ENTITIES).
+            accept(Servlets.JSON_MEDIA_TYPE).type(Servlets.JSON_MEDIA_TYPE).
+            method(HttpMethod.PUT, ClientResponse.class, entityArray);
+        Assert.assertEquals(clientResponse.getStatus(), Response.Status.OK.getStatusCode());
 
-        ClientResponse response = getEntityDefinition(tableId._getId());
-        String definition = getEntityDefinition(response);
+        // ATLAS-586: verify response entity can be parsed by GSON.
+        String entity = clientResponse.getEntity(String.class);
+        Gson gson = new Gson();
+        UpdateEntitiesResponse updateEntitiesResponse = null;
+        try {
+            updateEntitiesResponse = gson.fromJson(entity, UpdateEntitiesResponse.class);
+        }
+        catch (JsonSyntaxException e) {
+            Assert.fail("Response entity from " + service.path(ENTITIES).getURI() + " not parseable by GSON", e);
+        }
+        
+        clientResponse = getEntityDefinition(tableId._getId());
+        String definition = getEntityDefinition(clientResponse);
         Referenceable getReferenceable = InstanceSerialization.fromJsonReferenceable(definition, true);
         List<Referenceable> refs = (List<Referenceable>) getReferenceable.get("columns");
         Assert.assertEquals(refs.size(), 2);
 
         Assert.assertTrue(refs.get(0).equalsContents(columns.get(0)));
         Assert.assertTrue(refs.get(1).equalsContents(columns.get(1)));
+    }
+    
+    private static class UpdateEntitiesResponse {
+        String requestId;
+        String[] GUID;
+        AtlasEntity definition;
+    }
+    
+    private static class AtlasEntity {
+        String typeName;
+        final Map<String, Object> values = new HashMap<String, Object>();
     }
     
     @Test
@@ -745,10 +796,7 @@ public class EntityJerseyResourceIT extends BaseResourceIT {
             queryParam(AtlasClient.GUID.toLowerCase(), db1Id._getId()).
             queryParam(AtlasClient.GUID.toLowerCase(), db2Id._getId()).
             accept(Servlets.JSON_MEDIA_TYPE).type(Servlets.JSON_MEDIA_TYPE).method(HttpMethod.DELETE, ClientResponse.class);
-        Assert.assertEquals(clientResponse.getStatus(), Response.Status.OK.getStatusCode());
-
-        // Verify that response has guids for both database entities
-        JSONObject response = new JSONObject(clientResponse.getEntity(String.class));
+        JSONObject response = getEntity(clientResponse);
         final String deletedGuidsJson = response.getString(AtlasClient.GUID);
         Assert.assertNotNull(deletedGuidsJson);
         JSONArray guidsArray = new JSONArray(deletedGuidsJson);
@@ -762,15 +810,8 @@ public class EntityJerseyResourceIT extends BaseResourceIT {
 
         // Verify entities were deleted from the repository.
         for (String guid : deletedGuidsList) {
-            try {
-                serviceClient.getEntity(guid);
-                Assert.fail(AtlasServiceException.class.getSimpleName() + 
-                    " was expected but not thrown.  The entity with guid " + guid + 
-                    " still exists in the repository after being deleted.");
-            }
-            catch (AtlasServiceException e) {
-                Assert.assertTrue(e.getMessage().contains(Integer.toString(Response.Status.NOT_FOUND.getStatusCode())));
-            }
+            Referenceable entity = serviceClient.getEntity(guid);
+            assertEquals(entity.getId().getState(), Id.EntityState.DELETED);
         }
     }
     
@@ -796,15 +837,8 @@ public class EntityJerseyResourceIT extends BaseResourceIT {
         
         // Verify entities were deleted from the repository.
         for (String guid : deletedGuidsList) {
-            try {
-                serviceClient.getEntity(guid);
-                Assert.fail(AtlasServiceException.class.getSimpleName() + 
-                    " was expected but not thrown.  The entity with guid " + guid + 
-                    " still exists in the repository after being deleted.");
-            }
-            catch (AtlasServiceException e) {
-                Assert.assertTrue(e.getMessage().contains(Integer.toString(Response.Status.NOT_FOUND.getStatusCode())));
-            }
+            Referenceable entity = serviceClient.getEntity(guid);
+            assertEquals(entity.getId().getState(), Id.EntityState.DELETED);
         }
     }
 
@@ -826,15 +860,8 @@ public class EntityJerseyResourceIT extends BaseResourceIT {
 
         // Verify entities were deleted from the repository.
         for (String guid : deletedGuidsList) {
-            try {
-                serviceClient.getEntity(guid);
-                Assert.fail(AtlasServiceException.class.getSimpleName() +
-                    " was expected but not thrown.  The entity with guid " + guid +
-                    " still exists in the repository after being deleted.");
-            }
-            catch (AtlasServiceException e) {
-                Assert.assertTrue(e.getMessage().contains(Integer.toString(Response.Status.NOT_FOUND.getStatusCode())));
-            }
+            Referenceable entity = serviceClient.getEntity(guid);
+            assertEquals(entity.getId().getState(), Id.EntityState.DELETED);
         }
     }
 

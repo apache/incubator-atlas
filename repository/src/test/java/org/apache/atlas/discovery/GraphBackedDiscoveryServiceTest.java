@@ -21,6 +21,7 @@ package org.apache.atlas.discovery;
 import com.google.common.collect.ImmutableSet;
 import org.apache.atlas.BaseHiveRepositoryTest;
 import org.apache.atlas.RepositoryMetadataModule;
+import org.apache.atlas.RequestContext;
 import org.apache.atlas.TestUtils;
 import org.apache.atlas.discovery.graph.GraphBackedDiscoveryService;
 import org.apache.atlas.repository.Constants;
@@ -38,6 +39,7 @@ import org.codehaus.jettison.json.JSONObject;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
+import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Guice;
 import org.testng.annotations.Test;
@@ -67,11 +69,8 @@ public class GraphBackedDiscoveryServiceTest extends BaseHiveRepositoryTest {
         TypeSystem typeSystem = TypeSystem.getInstance();
         TestUtils.defineDeptEmployeeTypes(typeSystem);
 
-        Referenceable hrDept = TestUtils.createDeptEg1(typeSystem);
-        ClassType deptType = typeSystem.getDataType(ClassType.class, "Department");
-        ITypedReferenceableInstance hrDept2 = deptType.convert(hrDept, Multiplicity.REQUIRED);
-
-        repositoryService.createEntities(hrDept2);
+        ITypedReferenceableInstance hrDept = TestUtils.createDeptEg1(typeSystem);
+        repositoryService.createEntities(hrDept);
         
         ITypedReferenceableInstance jane = repositoryService.getEntityDefinition("Person", "name", "Jane");
         Id janeGuid = jane.getId();
@@ -81,13 +80,18 @@ public class GraphBackedDiscoveryServiceTest extends BaseHiveRepositoryTest {
         repositoryService.updateEntities(instance);
     }
 
+    @BeforeMethod
+    public void setupContext() {
+        RequestContext.createContext();
+    }
+
     @AfterClass
     public void tearDown() throws Exception {
         super.tearDown();
     }
 
     @Test
-    public void testSearchByDSL() throws Exception {
+    public void testSearchByDSLReturnsEntity() throws Exception {
         String dslQuery = "from Department";
 
         String jsonResults = discoveryService.searchByDSL(dslQuery);
@@ -109,6 +113,10 @@ public class GraphBackedDiscoveryServiceTest extends BaseHiveRepositoryTest {
         JSONArray rows = results.getJSONArray("rows");
         Assert.assertNotNull(rows);
         Assert.assertEquals(rows.length(), 1);
+
+        //Assert that entity state is set in the result entities
+        String entityState = rows.getJSONObject(0).getJSONObject("$id$").getString("state");
+        Assert.assertEquals(entityState, Id.EntityState.ACTIVE.name());
     }
 
     @Test(expectedExceptions = Throwable.class)
