@@ -3,6 +3,7 @@ Apache Atlas Release Notes
 
 --trunk - unreleased
 INCOMPATIBLE CHANGES:
+ATLAS-672 UI: Make dashboard v2 the default UI implementation (bergenholtz via yhemanth)
 ATLAS-532 Change Data types of all timestamps in Hive model(currently long)(sumasai via yhemanth)
 ATLAS-622 Introduce soft delete (shwethags)
 ATLAS-494 UI Authentication (nixonrodrigues via shwethags)
@@ -17,6 +18,14 @@ ATLAS-409 Atlas will not import avro tables with schema read from a file (dosset
 ATLAS-379 Create sqoop and falcon metadata addons (venkatnrangan,bvellanki,sowmyaramesh via shwethags)
 
 ALL CHANGES:
+ATLAS-723 JSON deserialization regression (guptaneeru via shwethags)
+ATLAS-728 Fix few typos in committer email IDs (yhemanth)
+ATLAS-435 Add ORDER BY and Limit to search DSL (neerugupta via sumasai)
+ATLAS-543 Entity Instance requests should not require ID element for new Entities (harishjp via shwethags)
+ATLAS-681 update committer/ppmc members in the pom.xml (sneethiraj via shwethags)
+ATLAS-616 Resolve OOM - Zookeeper throws exceptions when trying to fire DSL queries at Atlas at large scale. (yhemanth via sumasai)
+ATLAS-530 Add table information to column class (sumasai)
+ATLAS-538 Rename table should retain traits/tags assigned to columns/storage descriptors (sumasai)
 ATLAS-628 Starting two Atlas instances at the same time causes exceptions in HA mode (yhemanth via sumasai)
 ATLAS-594 alter table rename doesnt work across databases (sumasai via shwethags)
 ATLAS-586 While updating the multiple attributes, Atlas returns the response with escape characters (dkantor via shwethags)
