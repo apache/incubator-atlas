@@ -18,12 +18,12 @@
 
 package org.apache.atlas.storm.hook;
 
-import backtype.storm.ISubmitterHook;
-import backtype.storm.generated.Bolt;
-import backtype.storm.generated.SpoutSpec;
-import backtype.storm.generated.StormTopology;
-import backtype.storm.generated.TopologyInfo;
-import backtype.storm.utils.Utils;
+import org.apache.storm.ISubmitterHook;
+import org.apache.storm.generated.Bolt;
+import org.apache.storm.generated.SpoutSpec;
+import org.apache.storm.generated.StormTopology;
+import org.apache.storm.generated.TopologyInfo;
+import org.apache.storm.utils.Utils;
 import org.apache.atlas.AtlasClient;
 import org.apache.atlas.AtlasConstants;
 import org.apache.atlas.fs.model.FSDataTypes;
@@ -110,7 +110,8 @@ public class StormAtlasHook extends AtlasHook implements ISubmitterHook {
         Referenceable topologyReferenceable = new Referenceable(
                 StormDataTypes.STORM_TOPOLOGY.getName());
         topologyReferenceable.set("id", topologyInfo.get_id());
-        topologyReferenceable.set("name", topologyInfo.get_name());
+        topologyReferenceable.set(AtlasClient.NAME, topologyInfo.get_name());
+        topologyReferenceable.set(AtlasClient.REFERENCEABLE_ATTRIBUTE_NAME, topologyInfo.get_name());
         String owner = topologyInfo.get_owner();
         if (StringUtils.isEmpty(owner)) {
             owner = ANONYMOUS_OWNER;

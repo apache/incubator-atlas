@@ -18,10 +18,10 @@
 
 package org.apache.atlas.examples;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
-
 import org.apache.atlas.ApplicationProperties;
 import org.apache.atlas.AtlasClient;
 import org.apache.atlas.AtlasException;
@@ -40,9 +40,9 @@ import org.apache.atlas.typesystem.types.Multiplicity;
 import org.apache.atlas.typesystem.types.StructTypeDefinition;
 import org.apache.atlas.typesystem.types.TraitType;
 import org.apache.atlas.typesystem.types.utils.TypesUtil;
+import org.apache.atlas.utils.AuthenticationUtil;
 import org.apache.commons.configuration.Configuration;
 import org.codehaus.jettison.json.JSONArray;
-
 import java.util.List;
 
 /**
@@ -71,8 +71,24 @@ public class QuickStart {
     public static final String INPUT_TABLES_ATTRIBUTE = "inputTables";
 
     public static void main(String[] args) throws Exception {
+        String[] basicAuthUsernamePassword = null;
+        if (!AuthenticationUtil.isKerberosAuthicationEnabled()) {
+            basicAuthUsernamePassword = AuthenticationUtil.getBasicAuthenticationInput();
+        }
+
+        runQuickstart(args, basicAuthUsernamePassword);
+    }
+
+    @VisibleForTesting
+    static void runQuickstart(String[] args, String[] basicAuthUsernamePassword) throws Exception {
         String baseUrl = getServerUrl(args);
-        QuickStart quickStart = new QuickStart(baseUrl);
+        QuickStart quickStart;
+
+        if (!AuthenticationUtil.isKerberosAuthicationEnabled()) {
+            quickStart = new QuickStart(baseUrl, basicAuthUsernamePassword);
+        } else {
+            quickStart = new QuickStart(baseUrl);
+        }
 
         // Shows how to create types in Atlas for your meta model
         quickStart.createTypes();
@@ -112,10 +128,16 @@ public class QuickStart {
 
     private final AtlasClient metadataServiceClient;
 
-    QuickStart(String baseUrl) {
+    QuickStart(String baseUrl,String[] basicAuthUsernamePassword) {
         String[] urls = baseUrl.split(",");
-        metadataServiceClient = new AtlasClient(null, null, urls);
+        metadataServiceClient = new AtlasClient(urls,basicAuthUsernamePassword);
     }
+
+    QuickStart(String baseUrl) throws AtlasException {
+        String[] urls = baseUrl.split(",");
+        metadataServiceClient = new AtlasClient(urls);
+    }
+
 
     void createTypes() throws Exception {
         TypesDef typesDef = createTypeDefinitions();
@@ -292,11 +314,11 @@ public class QuickStart {
 
         String entityJSON = InstanceSerialization.toJson(referenceable, true);
         System.out.println("Submitting new entity= " + entityJSON);
-        JSONArray guids = metadataServiceClient.createEntity(entityJSON);
+        List<String> guids = metadataServiceClient.createEntity(entityJSON);
         System.out.println("created instance for type " + typeName + ", guid: " + guids);
 
         // return the Id for created instance with guid
-        return new Id(guids.getString(guids.length()-1), referenceable.getId().getVersion(),
+        return new Id(guids.get(guids.size() - 1), referenceable.getId().getVersion(),
                 referenceable.getTypeName());
     }
 
@@ -354,7 +376,8 @@ public class QuickStart {
     throws Exception {
         Referenceable referenceable = new Referenceable(LOAD_PROCESS_TYPE, traitNames);
         // super type attributes
-        referenceable.set("name", name);
+        referenceable.set(AtlasClient.NAME, name);
+        referenceable.set(AtlasClient.REFERENCEABLE_ATTRIBUTE_NAME, name);
         referenceable.set("description", description);
         referenceable.set(INPUTS_ATTRIBUTE, inputTables);
         referenceable.set(OUTPUTS_ATTRIBUTE, outputTables);

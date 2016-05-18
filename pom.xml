@@ -336,6 +336,7 @@
             <timezone>-8</timezone>
             <roles>
                 <role>committer</role>
+                <role>PPMC</role>
             </roles>
             <organization>Hortonworks Inc.</organization>
             <!--<organizationUrl>http://www.hortonworks.com</organizationUrl>-->
@@ -459,8 +460,10 @@
         <module>server-api</module>
         <module>notification</module>
         <module>client</module>
+        <module>graphdb</module>
         <module>titan</module>
         <module>repository</module>
+        <module>catalog</module>
         <!-- <module>dashboard</module> -->
         <module>dashboardv2</module>
         <module>webapp</module>
@@ -1085,6 +1088,12 @@
                 <version>${project.version}</version>
             </dependency>
 
+            <dependency>
+                <groupId>org.apache.atlas</groupId>
+                <artifactId>atlas-catalog</artifactId>
+                <version>${project.version}</version>
+            </dependency>         
+
             <!--Scala dependencies-->
             <dependency>
                 <groupId>org.scala-lang</groupId>
@@ -1236,7 +1245,7 @@
             <dependency>
                 <groupId>org.easymock</groupId>
                 <artifactId>easymock</artifactId>
-                <version>2.4</version>
+                <version>3.4</version>
                 <scope>test</scope>
             </dependency>
 
@@ -1346,7 +1355,7 @@
                 <plugin>
                     <groupId>com.github.eirslett</groupId>
                     <artifactId>frontend-maven-plugin</artifactId>
-                    <version>0.0.23</version>
+                    <version>0.0.29</version>
                 </plugin>
 
                 <plugin>
@@ -1370,7 +1379,7 @@
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-war-plugin</artifactId>
-                    <version>2.4</version>
+                    <version>2.6</version>
                 </plugin>
 
                 <plugin>
@@ -1656,15 +1665,18 @@
                         <exclude>**/overlays/**</exclude>
                         <exclude>dev-support/**</exclude>
                         <exclude>**/users-credentials.properties</exclude>
-			<exclude>**/public/css/animate.min.css</exclude>
-			<exclude>**/public/css/fonts/**</exclude>
-			<exclude>**/public/css/font-awesome.min.css</exclude>
-			<exclude>**/public/js/require-handlebars-plugin/**</exclude>
-			<exclude>**/node_modules/**</exclude>
-			<!-- All the npm plugins are copied here, so exclude it -->
-			<exclude>**/public/js/libs/**</exclude>
-  
+                        <exclude>**/public/css/animate.min.css</exclude>
+                        <exclude>**/public/css/fonts/**</exclude>
+                        <exclude>**/public/css/font-awesome.min.css</exclude>
+                        <exclude>**/public/js/require-handlebars-plugin/**</exclude>
+                        <exclude>**/node_modules/**</exclude>
+                        <!-- All the npm plugins are copied here, so exclude it -->
+                        <exclude>**/public/js/libs/**</exclude>
 
+                        <!-- atlas data directory creates when tests are run from IDE -->
+                        <exclude>**/atlas.data/**</exclude>
+                        <exclude>**/${sys:atlas.data}/**</exclude>
+                        <exclude>**/policy-store.txt</exclude>
                     </excludes>
                 </configuration>
                 <executions>

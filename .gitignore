@@ -16,6 +16,9 @@
 
 # Maven
 target
+dependency-reduced-pom.xml
+core*.dmp
+
 
 # IntelliJ
 *.iml
@@ -27,6 +30,7 @@ target
 .cache
 .classpath
 .project
+
 .settings
 .externalToolBuilders
 maven-eclipse.xml
@@ -45,3 +49,19 @@ test-output
 # other files
 .DS_Store
 *.swp
+
+#atlas data directory creates when tests are run from IDE
+**/atlas.data/**
+**/${sys:atlas.data}/**
+
+#hbase package downloaded
+distro/hbase/*.tar.gz
+
+#solr package downloaded
+distro/solr/*.tgz
+
+.cache-main
+
+# emacs files
+*#
+*~

@@ -25,9 +25,7 @@ import com.sun.jersey.api.client.Client;
 import com.sun.jersey.api.client.ClientResponse;
 import com.sun.jersey.api.client.WebResource;
 import com.sun.jersey.api.client.config.DefaultClientConfig;
-
 import kafka.consumer.ConsumerTimeoutException;
-
 import org.apache.atlas.ApplicationProperties;
 import org.apache.atlas.AtlasClient;
 import org.apache.atlas.AtlasServiceException;
@@ -51,11 +49,11 @@ import org.apache.atlas.typesystem.types.StructTypeDefinition;
 import org.apache.atlas.typesystem.types.TraitType;
 import org.apache.atlas.typesystem.types.TypeUtils;
 import org.apache.atlas.typesystem.types.utils.TypesUtil;
+import org.apache.atlas.utils.AuthenticationUtil;
 import org.apache.atlas.utils.ParamChecker;
 import org.apache.atlas.web.util.Servlets;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.lang.RandomStringUtils;
-import org.codehaus.jettison.json.JSONArray;
 import org.codehaus.jettison.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -65,7 +63,6 @@ import org.testng.annotations.BeforeClass;
 import javax.ws.rs.HttpMethod;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.UriBuilder;
-
 import java.util.List;
 
 /**
@@ -78,7 +75,8 @@ public abstract class BaseResourceIT {
     protected WebResource service;
     protected AtlasClient serviceClient;
     public static final Logger LOG = LoggerFactory.getLogger(BaseResourceIT.class);
-    protected static final int MAX_WAIT_TIME = 1000;
+    protected static final int MAX_WAIT_TIME = 60000;
+    protected String baseUrl;
 
     @BeforeClass
     public void setUp() throws Exception {
@@ -86,11 +84,16 @@ public abstract class BaseResourceIT {
         DefaultClientConfig config = new DefaultClientConfig();
         Client client = Client.create(config);
         Configuration configuration = ApplicationProperties.get();
-        String baseUrl = configuration.getString(ATLAS_REST_ADDRESS, "http://localhost:21000/");
+        baseUrl = configuration.getString(ATLAS_REST_ADDRESS, "http://localhost:21000/");
         client.resource(UriBuilder.fromUri(baseUrl).build());
 
         service = client.resource(UriBuilder.fromUri(baseUrl).build());
-        serviceClient = new AtlasClient(baseUrl);
+
+        if (!AuthenticationUtil.isKerberosAuthicationEnabled()) {
+            serviceClient = new AtlasClient(new String[]{baseUrl}, new String[]{"admin", "admin"});
+        } else {
+            serviceClient = new AtlasClient(baseUrl);
+        }
     }
 
     protected void createType(TypesDef typesDef) throws Exception {
@@ -126,12 +129,12 @@ public abstract class BaseResourceIT {
 
         String entityJSON = InstanceSerialization.toJson(referenceable, true);
         System.out.println("Submitting new entity= " + entityJSON);
-        JSONArray guids = serviceClient.createEntity(entityJSON);
+        List<String> guids = serviceClient.createEntity(entityJSON);
         System.out.println("created instance for type " + typeName + ", guid: " + guids);
 
         // return the reference to created instance with guid
-        if (guids.length() > 0) {
-            return new Id(guids.getString(guids.length() - 1), 0, referenceable.getTypeName());
+        if (guids.size() > 0) {
+            return new Id(guids.get(guids.size() - 1), 0, referenceable.getTypeName());
         }
         return null;
     }
