@@ -13,8 +13,7 @@
     },
     "keywords": [
         "Apache",
-        "Atlas",
-        "HortonWorks"
+        "Atlas"
     ],
     "dependencies": {
         "body-parser": "^1.2.0",
