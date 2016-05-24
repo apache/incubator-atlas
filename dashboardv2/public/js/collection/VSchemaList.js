@@ -25,7 +25,7 @@ define(['require',
     var VSchemaList = BaseCollection.extend(
         //Prototypal attributes
         {
-            url: Globals.baseURL + '/api/atlas/lineage/hive/table/log_fact_daily_mv/schema',
+            url: Globals.baseURL,
             model: VSchema,
             initialize: function() {
                 this.modelName = 'VSchema';
@@ -37,10 +37,11 @@ define(['require',
                     if (!this.modelAttrName) {
                         throw new Error("this.modelAttrName not defined for " + this);
                     }
+                    this.keyList = resp[this.modelAttrName].dataType.attributeDefinitions;
                     var arr = [];
                     resp[this.modelAttrName].rows.forEach(function(d) {
-                        arr.push(d)
-                    })
+                        arr.push(d);
+                    });
                     return arr;
                 } catch (e) {
                     console.log(e);

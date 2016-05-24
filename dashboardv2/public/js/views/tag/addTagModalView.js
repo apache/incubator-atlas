@@ -23,20 +23,21 @@ define(['require',
     'modules/Modal',
     'models/VEntity',
     'utils/Utils'
-], function(require, addTagModalViewTmpl, VTagList, VCommonList, Modal, VEntity, Utils) {
+], function(require, AddTagModalViewTmpl, VTagList, VCommonList, Modal, VEntity, Utils) {
     'use strict';
 
     var AddTagModel = Marionette.LayoutView.extend({
-        template: addTagModalViewTmpl,
+        template: AddTagModalViewTmpl,
 
         regions: {},
         ui: {
             addTagOptions: "[data-id='addTagOptions']",
             tagAttribute: "[data-id='tagAttribute']"
         },
-        events: {
-            'change #addTagID': 'onChangeTagDefination'
-
+        events: function() {
+            var events = {};
+            events["change " + this.ui.addTagOptions] = 'onChangeTagDefination';
+            return events;
         },
         /**
          * intialize a new AddTagModel Layout
@@ -44,22 +45,23 @@ define(['require',
          */
         initialize: function(options) {
             var that = this;
-            _.extend(this, _.pick(options, 'vent', 'modalCollection', 'guid'));
+            _.extend(this, _.pick(options, 'vent', 'modalCollection', 'guid', 'callback'));
             this.collection = new VTagList();
             this.commonCollection = new VCommonList();
-            var modal = new Modal({
+            this.modal = new Modal({
                 title: 'Add Tag',
                 content: this,
                 okText: 'Save',
                 cancelText: "Cancel",
                 allowCancel: true,
             }).open();
-
+            // var saveBtn = this.modal.$el.find('.btn-atlas');
+            // saveBtn[0].setAttribute('disabled', true);
             this.on('ok', function() {
                 that.saveTagData();
             });
             this.on('closeModal', function() {
-                modal.trigger('cancel');
+                this.modal.trigger('cancel');
             });
             this.bindEvents();
         },
@@ -77,14 +79,17 @@ define(['require',
             }, this);
         },
         tagsCollection: function() {
+            var str = '<option selected="selected" disabled="disabled">-- Select Tag --</option>';
             for (var i = 0; i < this.collection.fullCollection.models.length; i++) {
                 var tags = this.collection.fullCollection.models[i].get("tags");
-                var str = '<option>' + tags + '</option>';
-                this.ui.addTagOptions.append(str);
+                str += '<option>' + tags + '</option>';
+                this.ui.addTagOptions.html(str);
             }
         },
         onChangeTagDefination: function() {
             this.ui.tagAttribute.empty();
+            var saveBtn = this.modal.$el.find('.btn-success');
+            saveBtn.prop("disabled", false);
             var tagname = this.ui.addTagOptions.val();
             this.fetchTagSubData(tagname);
         },
@@ -102,11 +107,11 @@ define(['require',
                         '<div class="col-sm-8 input-spacing">' +
                         '<input type="text" class="form-control attributeInputVal attrName" data-key="' + attribute[i].name + '" ></input></div>';
                     this.ui.tagAttribute.append(this.strAttribute);
-                    if (this.commonCollection.models[0].attributes.traitTypes[0].superTypes.length > 0) {
-                        for (var j = 0; j < this.commonCollection.models[0].attributes.traitTypes[0].superTypes.length; j++) {
-                            var superTypeAttr = this.commonCollection.models[0].attributes.traitTypes[0].superTypes[j];
-                            this.fetchTagSubData(superTypeAttr);
-                        }
+                }
+                if (this.commonCollection.models[0].attributes.traitTypes[0].superTypes.length > 0) {
+                    for (var j = 0; j < this.commonCollection.models[0].attributes.traitTypes[0].superTypes.length; j++) {
+                        var superTypeAttr = this.commonCollection.models[0].attributes.traitTypes[0].superTypes[j];
+                        this.fetchTagSubData(superTypeAttr);
                     }
                 }
             }
@@ -130,10 +135,15 @@ define(['require',
                 data: JSON.stringify(json),
                 beforeSend: function() {},
                 success: function(data) {
-                    that.modalCollection.fetch({ reset: true });
                     Utils.notifySuccess({
-                        content: "Tag " + tagName + " has been added successfully"
+                        content: "Tag " + tagName + " has been added to entity"
                     });
+                    if (that.callback) {
+                        that.callback();
+                    }
+                    if (that.modalCollection) {
+                        that.modalCollection.fetch({ reset: true });
+                    }
                 },
                 error: function(error, data, status) {
                     var message = "Tag " + tagName + " could not be added";

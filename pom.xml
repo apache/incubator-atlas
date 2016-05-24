@@ -463,16 +463,19 @@
         <module>graphdb</module>
         <module>titan</module>
         <module>repository</module>
+        <module>authorization</module>
         <module>catalog</module>
         <!-- <module>dashboard</module> -->
         <module>dashboardv2</module>
         <module>webapp</module>
+	
         <module>docs</module>
         <module>addons/hdfs-model</module>
         <module>addons/hive-bridge</module>
         <module>addons/falcon-bridge</module>
         <module>addons/sqoop-bridge</module>
         <module>addons/storm-bridge</module>
+	
         <module>distro</module>
     </modules>
 
@@ -1670,6 +1673,7 @@
                         <exclude>**/public/css/font-awesome.min.css</exclude>
                         <exclude>**/public/js/require-handlebars-plugin/**</exclude>
                         <exclude>**/node_modules/**</exclude>
+                        <exclude>**/public/css/scss/**</exclude>
                         <!-- All the npm plugins are copied here, so exclude it -->
                         <exclude>**/public/js/libs/**</exclude>
 

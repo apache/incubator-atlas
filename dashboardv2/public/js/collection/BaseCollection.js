@@ -32,11 +32,29 @@ define(['require',
              * @constructs
              */
 
-            initialize: function() {
-
-            },
+            initialize: function() {},
             bindErrorEvents: function() {
                 this.bind("error", Utils.defaultErrorHandler);
+
+            },
+            bindLoader: function(element) {
+                this.bind('request', function(model, ajaxObj, collectionObj) {
+                    this.ajaxStart(collectionObj.$el);
+                }, this);
+                this.bind('sync', function(model, ajaxObj, collectionObj) {
+                    this.ajaxComplete(collectionObj.$el);
+                }, this);
+            },
+            ajaxStart: function(element) {
+                //start spinner
+                if (element) {
+                    element.prepend("<div class='loading'></div>");
+                }
+            },
+            ajaxComplete: function(element) {
+                if (element) {
+                    element.find('loading').remove();
+                }
             },
             /**
              * state required for the PageableCollection
@@ -45,9 +63,7 @@ define(['require',
                 firstPage: 0,
                 pageSize: Globals.settings.PAGE_SIZE
             },
-
             mode: 'client',
-
             /**
              * override the parseRecords of PageableCollection for our use
              */
@@ -57,7 +73,7 @@ define(['require',
                     query: resp.query,
                     queryType: resp.queryType,
                     requestId: resp.requestId
-                }
+                };
                 try {
                     if (!this.modelAttrName) {
                         throw new Error("this.modelAttrName not defined for " + this);
@@ -119,18 +135,14 @@ define(['require',
                         'name': k
                     }, defaults, v);
                 });
-
                 return retCols;
             },
-
             nonCrudOperation: function(url, requestMethod, options) {
                 return Backbone.sync.call(this, null, this, _.extend({
                     url: url,
                     type: requestMethod
                 }, options));
             }
-
         });
-
     return BaseCollection;
 });
