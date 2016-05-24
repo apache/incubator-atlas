@@ -32,7 +32,6 @@ import org.apache.falcon.atlas.publisher.FalconEventPublisher;
 import org.apache.falcon.entity.store.ConfigurationStore;
 import org.apache.falcon.entity.v0.feed.Feed;
 import org.apache.falcon.entity.v0.process.Process;
-import org.apache.falcon.security.CurrentUser;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -149,29 +148,24 @@ public class FalconHook extends AtlasHook implements FalconEventPublisher {
 
         switch (op) {
             case ADD:
-                messages.add(new HookNotification.EntityCreateRequest(getAuthenticatedUser(), createEntities(event)));
+                LOG.info("fireAndForget user:{}, ugi: {}", event.getUser(), event.getUgi());
+                messages.add(new HookNotification.EntityCreateRequest(getAuthenticatedUser(event.getUser()), createEntities(event)));
                 break;
 
             case UPDATE:
-                messages.add(new HookNotification.EntityUpdateRequest(getAuthenticatedUser(), createEntities(event)));
+                LOG.info("fireAndForget user:{}, ugi: {}", event.getUser(), event.getUgi());
+                messages.add(new HookNotification.EntityUpdateRequest(getAuthenticatedUser(event.getUser()), createEntities(event)));
                 break;
         }
         notifyEntities(messages);
     }
 
-    private String getAuthenticatedUser() {
-        String user = null;
-        try {
-            user = CurrentUser.getAuthenticatedUser();
-        } catch (IllegalArgumentException e) {
-            LOG.warn("Failed to get user from CurrentUser.getAuthenticatedUser");
-        }
+    private String getAuthenticatedUser(final String user) {
         return getUser(user, null);
     }
 
     private List<Referenceable> createEntities(FalconEvent event) throws Exception {
         List<Referenceable> entities = new ArrayList<>();
-
 
         switch (event.getOperation()) {
             case ADD_CLUSTER:
@@ -179,55 +173,6 @@ public class FalconHook extends AtlasHook implements FalconEventPublisher {
                 entities.addAll(FalconBridge.createClusterEntity((org.apache.falcon.entity.v0.cluster.Cluster) event.getEntity(), event.getUser(),
                         event.getTimestamp()));
                 break;
-
-        if (process.getClusters() != null) {
-
-            for (Cluster processCluster : process.getClusters().getClusters()) {
-                org.apache.falcon.entity.v0.cluster.Cluster cluster = STORE.get(EntityType.CLUSTER, processCluster.getName());
-
-                List<Referenceable> inputs = new ArrayList<>();
-                if (process.getInputs() != null) {
-                    for (Input input : process.getInputs().getInputs()) {
-                        List<Referenceable> clusterInputs = getInputOutputEntity(cluster, input.getFeed());
-                        if (clusterInputs != null) {
-                            entities.addAll(clusterInputs);
-                            inputs.add(clusterInputs.get(clusterInputs.size() - 1));
-                        }
-                    }
-                }
-
-                List<Referenceable> outputs = new ArrayList<>();
-                if (process.getOutputs() != null) {
-                    for (Output output : process.getOutputs().getOutputs()) {
-                        List<Referenceable> clusterOutputs = getInputOutputEntity(cluster, output.getFeed());
-                        if (clusterOutputs != null) {
-                            entities.addAll(clusterOutputs);
-                            outputs.add(clusterOutputs.get(clusterOutputs.size() - 1));
-                        }
-                    }
-                }
-
-                if (!inputs.isEmpty() || !outputs.isEmpty()) {
-                    Referenceable processEntity = new Referenceable(FalconDataTypes.FALCON_PROCESS_ENTITY.getName());
-                    processEntity.set(FalconDataModelGenerator.NAME, String.format("%s", process.getName(),
-                            cluster.getName()));
-                    processEntity.set(AtlasClient.REFERENCEABLE_ATTRIBUTE_NAME, String.format("%s@%s", process.getName(),
-                            cluster.getName()));
-                    processEntity.set(FalconDataModelGenerator.TIMESTAMP, timestamp);
-                    if (!inputs.isEmpty()) {
-                        processEntity.set(FalconDataModelGenerator.INPUTS, inputs);
-                    }
-                    if (!outputs.isEmpty()) {
-                        processEntity.set(FalconDataModelGenerator.OUTPUTS, outputs);
-                    }
-                    processEntity.set(FalconDataModelGenerator.USER, user);
-
-                    if (StringUtils.isNotEmpty(process.getTags())) {
-                        processEntity.set(FalconDataModelGenerator.TAGS,
-                                EventUtil.convertKeyValueStringToMap(process.getTags()));
-                    }
-                    entities.add(processEntity);
-                }
 
             case ADD_PROCESS:
             case UPDATE_PROCESS:
@@ -273,4 +218,3 @@ public class FalconHook extends AtlasHook implements FalconEventPublisher {
         }
     }
 }
-

@@ -303,50 +303,49 @@ public class FalconBridge {
                 }
 
                 if (!inputs.isEmpty() || !outputs.isEmpty()) {
-                    /* TODO: Check one process for each cluster */
-                    Referenceable processReferenceable = new Referenceable(FalconDataTypes.FALCON_PROCESS_ENTITY.getName());
-                    processReferenceable.set(FalconDataModelGenerator.NAME, String.format("%s@%s", process.getName(),
+                    Referenceable processEntity = new Referenceable(FalconDataTypes.FALCON_PROCESS_ENTITY.getName());
+                    processEntity.set(FalconDataModelGenerator.NAME, String.format("%s", process.getName()));
+                    processEntity.set(AtlasClient.REFERENCEABLE_ATTRIBUTE_NAME, String.format("%s@%s", process.getName(),
                             cluster.getName()));
-                    processReferenceable.set(FalconDataModelGenerator.PROCESS_NAME, process.getName());
+                    processEntity.set(FalconDataModelGenerator.TIMESTAMP, timestamp);
 
-                    processReferenceable.set(FalconDataModelGenerator.TIMESTAMP, timestamp);
                     if (!inputs.isEmpty()) {
-                        processReferenceable.set(FalconDataModelGenerator.INPUTS, inputs);
+                        processEntity.set(FalconDataModelGenerator.INPUTS, inputs);
                     }
                     if (!outputs.isEmpty()) {
-                        processReferenceable.set(FalconDataModelGenerator.OUTPUTS, outputs);
+                        processEntity.set(FalconDataModelGenerator.OUTPUTS, outputs);
                     }
 
                     // set cluster
                     Referenceable clusterReferenceable = getEntityReference(new Referenceable(FalconDataTypes
                             .FALCON_CLUSTER_ENTITY.getName()), cluster.getName());
                     entities.add(clusterReferenceable);
-                    processReferenceable.set(FalconDataModelGenerator.RUNSON, clusterReferenceable);
+                    processEntity.set(FalconDataModelGenerator.RUNSON, clusterReferenceable);
 
                     // Set user
                     Referenceable userReferenceable = createSimpleReferenceable(new Referenceable(FalconDataTypes
                             .FALCON_USER.getName()), user);
                     entities.add(userReferenceable);
-                    processReferenceable.set(FalconDataModelGenerator.USER, userReferenceable);
+                    processEntity.set(FalconDataModelGenerator.USER, userReferenceable);
 
                     if (StringUtils.isNotEmpty(process.getTags())) {
-                        processReferenceable.set(FalconDataModelGenerator.TAGS,
+                        processEntity.set(FalconDataModelGenerator.TAGS,
                                 EventUtil.convertKeyValueStringToMap(process.getTags()));
                     }
 
                     List<Referenceable> pipelines = getPipelineReferences(process.getPipelines());
                     if (pipelines != null) {
                         entities.addAll(pipelines);
-                        processReferenceable.set(FalconDataModelGenerator.PIPELINES, pipelines);
+                        processEntity.set(FalconDataModelGenerator.PIPELINES, pipelines);
                     }
 
                     Struct wfStruct = constructWFStruct(getProcessEntityWFProperties(process.getWorkflow(),
                             process.getName()));
 
                     if (wfStruct != null) {
-                        processReferenceable.set(FalconDataModelGenerator.WFPROPERTIES, wfStruct);
+                        processEntity.set(FalconDataModelGenerator.WFPROPERTIES, wfStruct);
                     }
-                    entities.add(processReferenceable);
+                    entities.add(processEntity);
                 }
 
             }
