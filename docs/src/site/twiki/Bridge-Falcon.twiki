@@ -3,6 +3,10 @@
 ---++ Falcon Model
 The default falcon modelling is available in org.apache.atlas.falcon.model.FalconDataModelGenerator. It defines the following types:
 <verbatim>
+falcon_cluster(ClassType) - super types [Infrastructure] - attributes [timestamp, collocated, owned-by, tags]
+falcon_feed(ClassType) - super types [Process] - attributes [timestamp, stored-in, tags]
+falcon_feed_dataset(ClassType) - super types [DataSet] - attributes [timestamp, stored-in, owned-by, groups, tags]
+falcon_replication_feed(ClassType) - super types [Process] - attributes [timestamp, owned-by]
 falcon_process(ClassType) - super types [Process] - attributes [timestamp, owned-by, tags]
 </verbatim>
 
@@ -10,6 +14,10 @@ One falcon_process entity is created for every cluster that the falcon process i
 
 The entities are created and de-duped using unique qualified name. They provide namespace and can be used for querying/lineage as well. The unique attributes are:
    * falcon_process - attribute name - <process name>@<cluster name>
+   * falcon_cluster - attribute name - <cluster name>
+   * falcon_feed - attribute name - <feed name>-@<cluster name>
+   * falcon_feed_dataset - attribute name - <feed name>-dataset@<cluster name>
+   * falcon_replication_feed - attribute name - <feed name>-replicated@<cluster name>
 
 ---++ Falcon Hook
 Falcon supports listeners on falcon entity submission. This is used to add entities in Atlas using the model defined in org.apache.atlas.falcon.model.FalconDataModelGenerator.
@@ -33,5 +41,4 @@ Refer [[Configuration][Configuration]] for notification related configurations
 
 
 ---++ Limitations
-   * Only the process entity creation is currently handled. This model will be expanded to include all Falcon metadata
    * In falcon cluster entity, cluster name used should be uniform across components like hive, falcon, sqoop etc. If used with ambari, ambari cluster name should be used for cluster entity

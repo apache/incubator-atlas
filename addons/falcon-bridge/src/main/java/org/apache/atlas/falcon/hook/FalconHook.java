@@ -170,8 +170,9 @@ public class FalconHook extends AtlasHook implements FalconEventPublisher {
         switch (event.getOperation()) {
             case ADD_CLUSTER:
             case UPDATE_CLUSTER:
-                entities.addAll(FalconBridge.createClusterEntity((org.apache.falcon.entity.v0.cluster.Cluster) event.getEntity(), event.getUser(),
+                entities.add(FalconBridge.createClusterEntity((org.apache.falcon.entity.v0.cluster.Cluster) event.getEntity(), event.getUser(),
                         event.getTimestamp()));
+                LOG.info("Sent to kafka");
                 break;
 
             case ADD_PROCESS:
@@ -218,3 +219,4 @@ public class FalconHook extends AtlasHook implements FalconEventPublisher {
         }
     }
 }
+

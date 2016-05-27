@@ -82,7 +82,7 @@ public class AtlasService implements FalconService, ConfigurationChangeListener 
                 addEntity(entity, operation);
                 break;
             default:
-                LOG.debug("Entity type not processed " + entityType);
+                LOG.debug("Entity type not processed {}", entityType);
         }
     }
 
@@ -107,7 +107,7 @@ public class AtlasService implements FalconService, ConfigurationChangeListener 
                 addEntity(newEntity, operation);
                 break;
             default:
-                LOG.debug("Entity type not processed " + entityType);
+                LOG.debug("Entity type not processed {}", entityType);
         }
     }
 

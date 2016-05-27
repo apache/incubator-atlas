@@ -21,6 +21,8 @@ package org.apache.falcon.atlas.event;
 import org.apache.falcon.entity.v0.Entity;
 import org.apache.hadoop.security.UserGroupInformation;
 
+import java.util.Date;
+
 /**
  * Falcon event to interface with Atlas Service.
  */
@@ -62,8 +64,8 @@ public class FalconEvent {
         return operation;
     }
 
-    public long getTimestamp() {
-        return timestamp;
+    public Date getTimestamp() {
+        return new Date(timestamp);
     }
 
     public Entity getEntity() {
