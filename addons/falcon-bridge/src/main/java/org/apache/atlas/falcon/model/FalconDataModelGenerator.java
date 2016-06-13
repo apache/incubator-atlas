@@ -58,13 +58,18 @@ public class FalconDataModelGenerator {
 
     public static final String NAME = "name";
     public static final String TIMESTAMP = "timestamp";
+    public static final String COLO = "collocated";
     public static final String USER = "owned-by";
     public static final String TAGS = "tag-classification";
+    public static final String GROUPS = "grouped-as";
+    public static final String PIPELINES = "pipeline";
+    public static final String WFPROPERTIES = "wf-properties";
+    public static final String RUNSON = "runs-on";
+    public static final String STOREDIN = "stored-in";
 
     // multiple inputs and outputs for process
     public static final String INPUTS = "inputs";
     public static final String OUTPUTS = "outputs";
-
 
     public FalconDataModelGenerator() {
         classTypeDefinitions = new HashMap<>();
@@ -74,7 +79,13 @@ public class FalconDataModelGenerator {
 
     public void createDataModel() throws AtlasException {
         LOG.info("Generating the Falcon Data Model");
+
+        // classes
+        createClusterEntityClass();
         createProcessEntityClass();
+        createFeedEntityClass();
+        createFeedDatasetClass();
+        createReplicationFeedEntityClass();
 
     }
 
@@ -103,24 +114,99 @@ public class FalconDataModelGenerator {
         return ImmutableList.of();
     }
 
-
-    private void createProcessEntityClass() throws AtlasException {
+    private void createClusterEntityClass() throws AtlasException {
         AttributeDefinition[] attributeDefinitions = new AttributeDefinition[]{
-                new AttributeDefinition(TIMESTAMP, DataTypes.LONG_TYPE.getName(), Multiplicity.REQUIRED, false,
+                new AttributeDefinition(TIMESTAMP, DataTypes.DATE_TYPE.getName(), Multiplicity.OPTIONAL, false,
                         null),
-                new AttributeDefinition(USER, DataTypes.STRING_TYPE.getName(), Multiplicity.REQUIRED, false,
+                new AttributeDefinition(COLO, DataTypes.STRING_TYPE.getName(), Multiplicity.REQUIRED, false,
+                        null),
+                new AttributeDefinition(USER, DataTypes.STRING_TYPE.getName(), Multiplicity.OPTIONAL, false,
                         null),
                 // map of tags
                 new AttributeDefinition(TAGS, DataTypes.mapTypeName(DataTypes.STRING_TYPE.getName(), DataTypes.STRING_TYPE.getName()),
                         Multiplicity.OPTIONAL, false, null),};
 
         HierarchicalTypeDefinition<ClassType> definition =
+                new HierarchicalTypeDefinition<>(ClassType.class, FalconDataTypes.FALCON_CLUSTER_ENTITY.getName(), null,
+                        ImmutableSet.of(AtlasClient.INFRASTRUCTURE_SUPER_TYPE), attributeDefinitions);
+        classTypeDefinitions.put(FalconDataTypes.FALCON_CLUSTER_ENTITY.getName(), definition);
+        LOG.debug("Created definition for {}", FalconDataTypes.FALCON_CLUSTER_ENTITY.getName());
+    }
+
+    private void createFeedEntityClass() throws AtlasException {
+        AttributeDefinition[] attributeDefinitions = new AttributeDefinition[]{
+                new AttributeDefinition(TIMESTAMP, DataTypes.DATE_TYPE.getName(), Multiplicity.REQUIRED, false,
+                        null),
+                new AttributeDefinition(STOREDIN, FalconDataTypes.FALCON_CLUSTER_ENTITY.getName(), Multiplicity.REQUIRED,
+                        false, null),
+                new AttributeDefinition(USER, DataTypes.STRING_TYPE.getName(), Multiplicity.REQUIRED, false,
+                        null)};
+
+        HierarchicalTypeDefinition<ClassType> definition =
+                new HierarchicalTypeDefinition<>(ClassType.class, FalconDataTypes.FALCON_FEED_ENTITY.getName(), null,
+                        ImmutableSet.of(AtlasClient.PROCESS_SUPER_TYPE), attributeDefinitions);
+        classTypeDefinitions.put(FalconDataTypes.FALCON_FEED_ENTITY.getName(), definition);
+        LOG.debug("Created definition for {}", FalconDataTypes.FALCON_FEED_ENTITY.getName());
+    }
+
+    private void createFeedDatasetClass() throws AtlasException {
+        AttributeDefinition[] attributeDefinitions = new AttributeDefinition[]{
+                new AttributeDefinition(TIMESTAMP, DataTypes.DATE_TYPE.getName(), Multiplicity.OPTIONAL, false,
+                        null),
+                new AttributeDefinition(STOREDIN, FalconDataTypes.FALCON_CLUSTER_ENTITY.getName(), Multiplicity.REQUIRED,
+                        false, null),
+                new AttributeDefinition(USER, DataTypes.STRING_TYPE.getName(), Multiplicity.OPTIONAL, false,
+                        null),
+                new AttributeDefinition(GROUPS, DataTypes.STRING_TYPE.getName(), Multiplicity.OPTIONAL, false, null),
+                // map of tags
+                new AttributeDefinition(TAGS, DataTypes.mapTypeName(DataTypes.STRING_TYPE.getName(), DataTypes.STRING_TYPE.getName()),
+                        Multiplicity.OPTIONAL, false, null),};
+
+        HierarchicalTypeDefinition<ClassType> definition =
+                new HierarchicalTypeDefinition<>(ClassType.class, FalconDataTypes.FALCON_FEED_DATASET.getName(), null,
+                        ImmutableSet.of(AtlasClient.DATA_SET_SUPER_TYPE), attributeDefinitions);
+        classTypeDefinitions.put(FalconDataTypes.FALCON_FEED_DATASET.getName(), definition);
+        LOG.debug("Created definition for {}", FalconDataTypes.FALCON_FEED_DATASET.getName());
+    }
+
+
+    private void createReplicationFeedEntityClass() throws AtlasException {
+        AttributeDefinition[] attributeDefinitions = new AttributeDefinition[]{
+                new AttributeDefinition(TIMESTAMP, DataTypes.DATE_TYPE.getName(), Multiplicity.REQUIRED, false,
+                        null),
+                new AttributeDefinition(USER, DataTypes.STRING_TYPE.getName(), Multiplicity.REQUIRED, false,
+                        null)};
+
+        HierarchicalTypeDefinition<ClassType> definition =
+                new HierarchicalTypeDefinition<>(ClassType.class,
+                        FalconDataTypes.FALCON_REPLICATION_FEED_ENTITY.getName(), null,
+                        ImmutableSet.of(AtlasClient.PROCESS_SUPER_TYPE), attributeDefinitions);
+        classTypeDefinitions.put(FalconDataTypes.FALCON_REPLICATION_FEED_ENTITY.getName(), definition);
+        LOG.debug("Created definition for {}", FalconDataTypes.FALCON_REPLICATION_FEED_ENTITY.getName());
+    }
+
+    private void createProcessEntityClass() throws AtlasException {
+        AttributeDefinition[] attributeDefinitions = new AttributeDefinition[]{
+                new AttributeDefinition(TIMESTAMP, DataTypes.DATE_TYPE.getName(), Multiplicity.REQUIRED, false,
+                        null),
+                new AttributeDefinition(RUNSON, FalconDataTypes.FALCON_CLUSTER_ENTITY.getName(), Multiplicity.REQUIRED,
+                        false, null),
+                new AttributeDefinition(USER, DataTypes.STRING_TYPE.getName(), Multiplicity.REQUIRED, false,
+                        null),
+                // map of tags
+                new AttributeDefinition(TAGS, DataTypes.mapTypeName(DataTypes.STRING_TYPE.getName(), DataTypes.STRING_TYPE.getName()),
+                        Multiplicity.OPTIONAL, false, null),
+                new AttributeDefinition(PIPELINES, DataTypes.STRING_TYPE.getName(), Multiplicity.OPTIONAL, false, null),
+                // wf properties
+                new AttributeDefinition(WFPROPERTIES, DataTypes.mapTypeName(DataTypes.STRING_TYPE.getName(), DataTypes.STRING_TYPE.getName()),
+                        Multiplicity.OPTIONAL, false, null),};
+
+        HierarchicalTypeDefinition<ClassType> definition =
                 new HierarchicalTypeDefinition<>(ClassType.class, FalconDataTypes.FALCON_PROCESS_ENTITY.getName(), null,
-                    ImmutableSet.of(AtlasClient.PROCESS_SUPER_TYPE), attributeDefinitions);
+                        ImmutableSet.of(AtlasClient.PROCESS_SUPER_TYPE), attributeDefinitions);
         classTypeDefinitions.put(FalconDataTypes.FALCON_PROCESS_ENTITY.getName(), definition);
         LOG.debug("Created definition for {}", FalconDataTypes.FALCON_PROCESS_ENTITY.getName());
     }
-
 
 
     public String getModelAsJson() throws AtlasException {

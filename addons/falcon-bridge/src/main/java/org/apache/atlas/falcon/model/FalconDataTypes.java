@@ -22,8 +22,11 @@ package org.apache.atlas.falcon.model;
  * Falcon Data Types for model and bridge.
  */
 public enum FalconDataTypes {
-
-
+    // Classes
+    FALCON_CLUSTER_ENTITY("falcon_cluster"),
+    FALCON_FEED_ENTITY("falcon_feed"),
+    FALCON_FEED_DATASET("falcon_feed_dataset"),
+    FALCON_REPLICATION_FEED_ENTITY("falcon_replication_feed"),
     FALCON_PROCESS_ENTITY("falcon_process"),
     ;
 
