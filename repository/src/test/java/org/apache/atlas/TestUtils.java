@@ -19,14 +19,16 @@
 package org.apache.atlas;
 
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
 import com.thinkaurelius.titan.core.TitanGraph;
-import com.tinkerpop.blueprints.Edge;
-import com.tinkerpop.blueprints.Vertex;
 import com.tinkerpop.blueprints.util.io.graphson.GraphSONWriter;
 import org.apache.atlas.repository.graph.GraphHelper;
+import org.apache.atlas.services.MetadataService;
 import org.apache.atlas.typesystem.ITypedReferenceableInstance;
 import org.apache.atlas.typesystem.Referenceable;
 import org.apache.atlas.typesystem.TypesDef;
+import org.apache.atlas.typesystem.json.InstanceSerialization;
+import org.apache.atlas.typesystem.persistence.Id;
 import org.apache.atlas.typesystem.types.AttributeDefinition;
 import org.apache.atlas.typesystem.types.ClassType;
 import org.apache.atlas.typesystem.types.DataTypes;
@@ -40,16 +42,23 @@ import org.apache.atlas.typesystem.types.TraitType;
 import org.apache.atlas.typesystem.types.TypeSystem;
 import org.apache.atlas.typesystem.types.utils.TypesUtil;
 import org.apache.commons.lang.RandomStringUtils;
+import org.codehaus.jettison.json.JSONArray;
 import org.testng.Assert;
 
 import java.io.File;
+import java.math.BigDecimal;
+import java.math.BigInteger;
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Date;
+import java.util.List;
 
 import static org.apache.atlas.typesystem.types.utils.TypesUtil.createClassTypeDef;
 import static org.apache.atlas.typesystem.types.utils.TypesUtil.createOptionalAttrDef;
 import static org.apache.atlas.typesystem.types.utils.TypesUtil.createRequiredAttrDef;
 import static org.apache.atlas.typesystem.types.utils.TypesUtil.createStructTypeDef;
 import static org.apache.atlas.typesystem.types.utils.TypesUtil.createTraitTypeDef;
+import static org.apache.atlas.typesystem.types.utils.TypesUtil.createUniqueRequiredAttrDef;
 
 /**
  * Test utility class.
@@ -73,16 +82,7 @@ public final class TestUtils {
         System.out.println("tempFile.getPath() = " + tempFile.getPath());
         GraphSONWriter.outputGraph(titanGraph, tempFile.getPath());
 
-        System.out.println("Vertices:");
-        for (Vertex vertex : titanGraph.getVertices()) {
-            System.out.println(GraphHelper.vertexString(vertex));
-        }
-
-        System.out.println("Edges:");
-        for (Edge edge : titanGraph.getEdges()) {
-            System.out.println(GraphHelper.edgeString(edge));
-        }
-
+        GraphHelper.dumpToLog(titanGraph);
         return tempFile.getPath();
     }
 
@@ -96,32 +96,44 @@ public final class TestUtils {
      */
     public static void defineDeptEmployeeTypes(TypeSystem ts) throws AtlasException {
 
+        String _description = "_description";
         EnumTypeDefinition orgLevelEnum =
-                new EnumTypeDefinition("OrgLevel", new EnumValue("L1", 1), new EnumValue("L2", 2));
+                new EnumTypeDefinition("OrgLevel", "OrgLevel"+_description, new EnumValue("L1", 1), new EnumValue("L2", 2));
 
         StructTypeDefinition addressDetails =
-                createStructTypeDef("Address", createRequiredAttrDef("street", DataTypes.STRING_TYPE),
+                createStructTypeDef("Address", "Address"+_description, createRequiredAttrDef("street", DataTypes.STRING_TYPE),
                         createRequiredAttrDef("city", DataTypes.STRING_TYPE));
 
-        HierarchicalTypeDefinition<ClassType> deptTypeDef = createClassTypeDef("Department", ImmutableList.<String>of(),
+        HierarchicalTypeDefinition<ClassType> deptTypeDef = createClassTypeDef(DEPARTMENT_TYPE, "Department"+_description, ImmutableSet.<String>of(),
                 createRequiredAttrDef("name", DataTypes.STRING_TYPE),
-                new AttributeDefinition("employees", String.format("array<%s>", "Person"), Multiplicity.COLLECTION,
+                new AttributeDefinition("employees", String.format("array<%s>", "Person"), Multiplicity.OPTIONAL,
                         true, "department"));
 
-        HierarchicalTypeDefinition<ClassType> personTypeDef = createClassTypeDef("Person", ImmutableList.<String>of(),
+        HierarchicalTypeDefinition<ClassType> personTypeDef = createClassTypeDef("Person", "Person"+_description, ImmutableSet.<String>of(),
                 createRequiredAttrDef("name", DataTypes.STRING_TYPE),
                 createOptionalAttrDef("orgLevel", "OrgLevel"),
                 createOptionalAttrDef("address", "Address"),
                 new AttributeDefinition("department", "Department", Multiplicity.REQUIRED, false, "employees"),
                 new AttributeDefinition("manager", "Manager", Multiplicity.OPTIONAL, false, "subordinates"),
-                new AttributeDefinition("mentor", "Person", Multiplicity.OPTIONAL, false, null));
+                new AttributeDefinition("mentor", "Person", Multiplicity.OPTIONAL, false, null),
+                createOptionalAttrDef("birthday", DataTypes.DATE_TYPE),
+                createOptionalAttrDef("hasPets", DataTypes.BOOLEAN_TYPE),
+                createOptionalAttrDef("numberOfCars", DataTypes.BYTE_TYPE),
+                createOptionalAttrDef("houseNumber", DataTypes.SHORT_TYPE),
+                createOptionalAttrDef("carMileage", DataTypes.INT_TYPE),
+                createOptionalAttrDef("shares", DataTypes.LONG_TYPE),
+                createOptionalAttrDef("salary", DataTypes.DOUBLE_TYPE),
+                createOptionalAttrDef("age", DataTypes.FLOAT_TYPE),
+                createOptionalAttrDef("numberOfStarsEstimate", DataTypes.BIGINTEGER_TYPE),
+                createOptionalAttrDef("approximationOfPi", DataTypes.BIGDECIMAL_TYPE)
+                );
 
-        HierarchicalTypeDefinition<ClassType> managerTypeDef = createClassTypeDef("Manager", ImmutableList.of("Person"),
+        HierarchicalTypeDefinition<ClassType> managerTypeDef = createClassTypeDef("Manager", "Manager"+_description, ImmutableSet.of("Person"),
                 new AttributeDefinition("subordinates", String.format("array<%s>", "Person"), Multiplicity.COLLECTION,
                         false, "manager"));
 
         HierarchicalTypeDefinition<TraitType> securityClearanceTypeDef =
-                createTraitTypeDef("SecurityClearance", ImmutableList.<String>of(),
+                createTraitTypeDef("SecurityClearance", "SecurityClearance"+_description, ImmutableSet.<String>of(),
                         createRequiredAttrDef("level", DataTypes.INT_TYPE));
 
         ts.defineTypes(ImmutableList.of(orgLevelEnum), ImmutableList.of(addressDetails),
@@ -129,9 +141,13 @@ public final class TestUtils {
                 ImmutableList.of(deptTypeDef, personTypeDef, managerTypeDef));
     }
 
-    public static Referenceable createDeptEg1(TypeSystem ts) throws AtlasException {
-        Referenceable hrDept = new Referenceable(ENTITY_TYPE);
-        Referenceable john = new Referenceable("Person");
+    public static final String DEPARTMENT_TYPE = "Department";
+    public static final String PERSON_TYPE = "Person";
+
+    public static ITypedReferenceableInstance createDeptEg1(TypeSystem ts) throws AtlasException {
+        Referenceable hrDept = new Referenceable(DEPARTMENT_TYPE);
+        Referenceable john = new Referenceable(PERSON_TYPE);
+
         Referenceable jane = new Referenceable("Manager", "SecurityClearance");
         Referenceable johnAddr = new Referenceable("Address");
         Referenceable janeAddr = new Referenceable("Address");
@@ -139,7 +155,7 @@ public final class TestUtils {
         Referenceable juliusAddr = new Referenceable("Address");
         Referenceable max = new Referenceable("Person");
         Referenceable maxAddr = new Referenceable("Address");
-        
+
         hrDept.set("name", "hr");
         john.set("name", "John");
         john.set("department", hrDept);
@@ -147,11 +163,23 @@ public final class TestUtils {
         johnAddr.set("city", "Sunnyvale");
         john.set("address", johnAddr);
 
+        john.set("birthday",new Date(1950, 5, 15));
+        john.set("hasPets", true);
+        john.set("numberOfCars", 1);
+        john.set("houseNumber", 153);
+        john.set("carMileage", 13364);
+        john.set("shares", 15000);
+        john.set("salary", 123345.678);
+        john.set("age", 50);
+        john.set("numberOfStarsEstimate", new BigInteger("1000000000000000000000"));
+        john.set("approximationOfPi", new BigDecimal("3.141592653589793238462643383279502884197169399375105820974944592307816406286"));
+
         jane.set("name", "Jane");
         jane.set("department", hrDept);
         janeAddr.set("street", "Great America Parkway");
         janeAddr.set("city", "Santa Clara");
         jane.set("address", janeAddr);
+        janeAddr.set("street", "Great America Parkway");
 
         julius.set("name", "Julius");
         julius.set("department", hrDept);
@@ -159,7 +187,7 @@ public final class TestUtils {
         juliusAddr.set("city", "Newtonville");
         julius.set("address", juliusAddr);
         julius.set("subordinates", ImmutableList.<Referenceable>of());
-        
+
         max.set("name", "Max");
         max.set("department", hrDept);
         maxAddr.set("street", "Ripley St");
@@ -167,9 +195,19 @@ public final class TestUtils {
         max.set("address", maxAddr);
         max.set("manager", jane);
         max.set("mentor", julius);
-        
-        john.set("manager", jane);
+        max.set("birthday",new Date(1979, 3, 15));
+        max.set("hasPets", true);
+        max.set("age", 36);
+        max.set("numberOfCars", 2);
+        max.set("houseNumber", 17);
+        max.set("carMileage", 13);
+        max.set("shares", Long.MAX_VALUE);
+        max.set("salary", Double.MAX_VALUE);
+        max.set("numberOfStarsEstimate", new BigInteger("1000000000000000000000000000000"));
+        max.set("approximationOfPi", new BigDecimal("3.1415926535897932"));
 
+        john.set("manager", jane);
+        john.set("mentor", max);
         hrDept.set("employees", ImmutableList.of(john, jane, julius, max));
 
         jane.set("subordinates", ImmutableList.of(john, max));
@@ -180,53 +218,101 @@ public final class TestUtils {
         ITypedReferenceableInstance hrDept2 = deptType.convert(hrDept, Multiplicity.REQUIRED);
         Assert.assertNotNull(hrDept2);
 
-        return hrDept;
+        return hrDept2;
     }
 
-    public static final String ENTITY_TYPE = "Department";
     public static final String DATABASE_TYPE = "hive_database";
     public static final String DATABASE_NAME = "foo";
     public static final String TABLE_TYPE = "hive_table";
-    public static final String PARTITION_TYPE = "partition_type";
-    public static final String SERDE_TYPE = "serdeType";
+    public static final String PROCESS_TYPE = "hive_process";
+    public static final String COLUMN_TYPE = "column_type";
     public static final String TABLE_NAME = "bar";
     public static final String CLASSIFICATION = "classification";
     public static final String PII = "PII";
     public static final String SUPER_TYPE_NAME = "Base";
+    public static final String STORAGE_DESC_TYPE = "hive_storagedesc";
+    public static final String PARTITION_STRUCT_TYPE = "partition_struct_type";
+    public static final String PARTITION_CLASS_TYPE = "partition_class_type";
+    public static final String SERDE_TYPE = "serdeType";
+    public static final String COLUMNS_MAP = "columnsMap";
+    public static final String COLUMNS_ATTR_NAME = "columns";
+
+    public static final String NAME = "name";
 
     public static TypesDef defineHiveTypes() {
+        String _description = "_description";
         HierarchicalTypeDefinition<ClassType> superTypeDefinition =
-                createClassTypeDef(SUPER_TYPE_NAME, ImmutableList.<String>of(),
+                createClassTypeDef(SUPER_TYPE_NAME, ImmutableSet.<String>of(),
                         createOptionalAttrDef("namespace", DataTypes.STRING_TYPE),
                         createOptionalAttrDef("cluster", DataTypes.STRING_TYPE),
                         createOptionalAttrDef("colo", DataTypes.STRING_TYPE));
-
         HierarchicalTypeDefinition<ClassType> databaseTypeDefinition =
-                createClassTypeDef(DATABASE_TYPE, ImmutableList.of(SUPER_TYPE_NAME),
-                        TypesUtil.createUniqueRequiredAttrDef("name", DataTypes.STRING_TYPE),
+                createClassTypeDef(DATABASE_TYPE, DATABASE_TYPE + _description,ImmutableSet.of(SUPER_TYPE_NAME),
+                        TypesUtil.createUniqueRequiredAttrDef(NAME, DataTypes.STRING_TYPE),
                         createOptionalAttrDef("created", DataTypes.DATE_TYPE),
                         createRequiredAttrDef("description", DataTypes.STRING_TYPE));
 
 
-        StructTypeDefinition structTypeDefinition = new StructTypeDefinition("serdeType",
+        StructTypeDefinition structTypeDefinition = new StructTypeDefinition("serdeType", "serdeType" + _description,
                 new AttributeDefinition[]{createRequiredAttrDef("name", DataTypes.STRING_TYPE),
-                        createRequiredAttrDef("serde", DataTypes.STRING_TYPE),
-                        createOptionalAttrDef("description", DataTypes.STRING_TYPE)});
+                    createRequiredAttrDef("serde", DataTypes.STRING_TYPE),
+                    createOptionalAttrDef("description", DataTypes.STRING_TYPE)});
 
         EnumValue values[] = {new EnumValue("MANAGED", 1), new EnumValue("EXTERNAL", 2),};
 
-        EnumTypeDefinition enumTypeDefinition = new EnumTypeDefinition("tableType", values);
+        EnumTypeDefinition enumTypeDefinition = new EnumTypeDefinition("tableType", "tableType" + _description, values);
 
         HierarchicalTypeDefinition<ClassType> columnsDefinition =
-                createClassTypeDef("column_type", ImmutableList.<String>of(),
-                        createRequiredAttrDef("name", DataTypes.STRING_TYPE),
+                createClassTypeDef(COLUMN_TYPE, ImmutableSet.<String>of(),
+                        createUniqueRequiredAttrDef("name", DataTypes.STRING_TYPE),
                         createRequiredAttrDef("type", DataTypes.STRING_TYPE));
 
-        StructTypeDefinition partitionDefinition = new StructTypeDefinition("partition_type",
+        StructTypeDefinition partitionDefinition = new StructTypeDefinition("partition_struct_type", "partition_struct_type" + _description,
                 new AttributeDefinition[]{createRequiredAttrDef("name", DataTypes.STRING_TYPE),});
 
+        AttributeDefinition[] attributeDefinitions = new AttributeDefinition[]{
+            new AttributeDefinition("location", DataTypes.STRING_TYPE.getName(), Multiplicity.OPTIONAL, false,
+                null),
+            new AttributeDefinition("inputFormat", DataTypes.STRING_TYPE.getName(), Multiplicity.OPTIONAL, false,
+                null),
+            new AttributeDefinition("outputFormat", DataTypes.STRING_TYPE.getName(), Multiplicity.OPTIONAL, false,
+                null),
+            new AttributeDefinition("compressed", DataTypes.BOOLEAN_TYPE.getName(), Multiplicity.REQUIRED, false,
+                null),
+            new AttributeDefinition("numBuckets", DataTypes.INT_TYPE.getName(), Multiplicity.OPTIONAL, false,
+                null),
+            };
+
+        HierarchicalTypeDefinition<ClassType> storageDescClsDef =
+            new HierarchicalTypeDefinition<>(ClassType.class, STORAGE_DESC_TYPE, STORAGE_DESC_TYPE + _description,
+                ImmutableSet.of(SUPER_TYPE_NAME), attributeDefinitions);
+
+        AttributeDefinition[] partClsAttributes = new AttributeDefinition[]{
+            new AttributeDefinition("values", DataTypes.arrayTypeName(DataTypes.STRING_TYPE.getName()),
+                Multiplicity.OPTIONAL, false, null),
+            new AttributeDefinition("table", TABLE_TYPE, Multiplicity.REQUIRED, false, null),
+            new AttributeDefinition("createTime", DataTypes.LONG_TYPE.getName(), Multiplicity.OPTIONAL, false,
+                null),
+            new AttributeDefinition("lastAccessTime", DataTypes.LONG_TYPE.getName(), Multiplicity.OPTIONAL, false,
+                null),
+            new AttributeDefinition("sd", STORAGE_DESC_TYPE, Multiplicity.REQUIRED, true,
+                null),
+            new AttributeDefinition("columns", DataTypes.arrayTypeName(COLUMN_TYPE),
+                Multiplicity.OPTIONAL, true, null),
+            new AttributeDefinition("parameters", new DataTypes.MapType(DataTypes.STRING_TYPE, DataTypes.STRING_TYPE).getName(), Multiplicity.OPTIONAL, false, null),};
+
+        HierarchicalTypeDefinition<ClassType> partClsDef =
+            new HierarchicalTypeDefinition<>(ClassType.class, "partition_class_type", "partition_class_type" + _description,
+                ImmutableSet.of(SUPER_TYPE_NAME), partClsAttributes);
+
+        HierarchicalTypeDefinition<ClassType> processClsType =
+                new HierarchicalTypeDefinition<>(ClassType.class, PROCESS_TYPE, PROCESS_TYPE + _description,
+                        ImmutableSet.<String>of(), new AttributeDefinition[]{
+                        new AttributeDefinition("outputs", "array<" + TABLE_TYPE + ">", Multiplicity.OPTIONAL, false, null)
+                });
+
         HierarchicalTypeDefinition<ClassType> tableTypeDefinition =
-                createClassTypeDef(TABLE_TYPE, ImmutableList.of(SUPER_TYPE_NAME),
+                createClassTypeDef(TABLE_TYPE, TABLE_TYPE + _description, ImmutableSet.of(SUPER_TYPE_NAME),
                         TypesUtil.createUniqueRequiredAttrDef("name", DataTypes.STRING_TYPE),
                         createRequiredAttrDef("description", DataTypes.STRING_TYPE),
                         createRequiredAttrDef("type", DataTypes.STRING_TYPE),
@@ -238,25 +324,25 @@ public final class TestUtils {
                                 String.format("array<%s>", DataTypes.STRING_TYPE.getName()), Multiplicity.OPTIONAL,
                                 false, null),
                         // array of classes
-                        new AttributeDefinition("columns", String.format("array<%s>", "column_type"),
+                        new AttributeDefinition("columns", String.format("array<%s>", COLUMN_TYPE),
                                 Multiplicity.OPTIONAL, true, null),
                         // array of structs
-                        new AttributeDefinition("partitions", String.format("array<%s>", "partition_type"),
+                        new AttributeDefinition("partitions", String.format("array<%s>", "partition_struct_type"),
                                 Multiplicity.OPTIONAL, true, null),
                         // map of primitives
                         new AttributeDefinition("parametersMap",
                                 DataTypes.mapTypeName(DataTypes.STRING_TYPE.getName(), DataTypes.STRING_TYPE.getName()),
                                 Multiplicity.OPTIONAL, true, null),
-                         //map of classes -
-                        new AttributeDefinition("columnsMap",
+                        //map of classes -
+                        new AttributeDefinition(COLUMNS_MAP,
                                                         DataTypes.mapTypeName(DataTypes.STRING_TYPE.getName(),
-                                                                "column_type"),
-                                                        Multiplicity.COLLECTION, true, null),
+                                                                COLUMN_TYPE),
+                                                        Multiplicity.OPTIONAL, true, null),
                          //map of structs
                         new AttributeDefinition("partitionsMap",
                                                         DataTypes.mapTypeName(DataTypes.STRING_TYPE.getName(),
-                                                                "partition_type"),
-                                                        Multiplicity.COLLECTION, true, null),
+                                                                "partition_struct_type"),
+                                                        Multiplicity.OPTIONAL, true, null),
                         // struct reference
                         new AttributeDefinition("serde1", "serdeType", Multiplicity.OPTIONAL, false, null),
                         new AttributeDefinition("serde2", "serdeType", Multiplicity.OPTIONAL, false, null),
@@ -266,20 +352,21 @@ public final class TestUtils {
                         new AttributeDefinition("databaseComposite", DATABASE_TYPE, Multiplicity.OPTIONAL, true, null));
 
         HierarchicalTypeDefinition<TraitType> piiTypeDefinition =
-                createTraitTypeDef(PII, ImmutableList.<String>of());
+                createTraitTypeDef(PII, PII + _description, ImmutableSet.<String>of());
 
         HierarchicalTypeDefinition<TraitType> classificationTypeDefinition =
-                createTraitTypeDef(CLASSIFICATION, ImmutableList.<String>of(),
+                createTraitTypeDef(CLASSIFICATION, CLASSIFICATION + _description, ImmutableSet.<String>of(),
                         createRequiredAttrDef("tag", DataTypes.STRING_TYPE));
 
         HierarchicalTypeDefinition<TraitType> fetlClassificationTypeDefinition =
-                createTraitTypeDef("fetl" + CLASSIFICATION, ImmutableList.of(CLASSIFICATION),
+                createTraitTypeDef("fetl" + CLASSIFICATION, "fetl" + CLASSIFICATION + _description, ImmutableSet.of(CLASSIFICATION),
                         createRequiredAttrDef("tag", DataTypes.STRING_TYPE));
 
         return TypesUtil.getTypesDef(ImmutableList.of(enumTypeDefinition),
                 ImmutableList.of(structTypeDefinition, partitionDefinition),
                 ImmutableList.of(classificationTypeDefinition, fetlClassificationTypeDefinition, piiTypeDefinition),
-                ImmutableList.of(superTypeDefinition, databaseTypeDefinition, columnsDefinition, tableTypeDefinition));
+                ImmutableList.of(superTypeDefinition, databaseTypeDefinition, columnsDefinition, tableTypeDefinition,
+                        storageDescClsDef, partClsDef, processClsType));
     }
 
     public static Collection<IDataType> createHiveTypes(TypeSystem typeSystem) throws Exception {
@@ -287,10 +374,50 @@ public final class TestUtils {
             TypesDef typesDef = defineHiveTypes();
             return typeSystem.defineTypes(typesDef).values();
         }
-        return null;
+        return new ArrayList<>();
     }
 
     public static final String randomString() {
         return RandomStringUtils.randomAlphanumeric(10);
+    }
+
+    public static Referenceable createDBEntity() {
+        Referenceable entity = new Referenceable(DATABASE_TYPE);
+        String dbName = RandomStringUtils.randomAlphanumeric(10);
+        entity.set(NAME, dbName);
+        entity.set("description", "us db");
+        return entity;
+    }
+
+    public static Referenceable createTableEntity(String dbId) {
+        Referenceable entity = new Referenceable(TABLE_TYPE);
+        String tableName = RandomStringUtils.randomAlphanumeric(10);
+        entity.set(NAME, tableName);
+        entity.set("description", "random table");
+        entity.set("type", "type");
+        entity.set("tableType", "MANAGED");
+        entity.set("database", new Id(dbId, 0, DATABASE_TYPE));
+        entity.set("created", new Date());
+        return entity;
+    }
+
+    public static Referenceable createColumnEntity() {
+        Referenceable entity = new Referenceable(COLUMN_TYPE);
+        entity.set(NAME, RandomStringUtils.randomAlphanumeric(10));
+        entity.set("type", "VARCHAR(32)");
+        return entity;
+    }
+
+    public static String createInstance(MetadataService metadataService, Referenceable entity) throws Exception {
+        RequestContext.createContext();
+
+        String entityjson = InstanceSerialization.toJson(entity, true);
+        JSONArray entitiesJson = new JSONArray();
+        entitiesJson.put(entityjson);
+        List<String> guids = metadataService.createEntities(entitiesJson.toString());
+        if (guids != null && guids.size() > 0) {
+            return guids.get(guids.size() - 1);
+        }
+        return null;
     }
 }

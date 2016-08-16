@@ -21,92 +21,128 @@ import traceback
 
 import atlas_config as mc
 
-METADATA_LOG_OPTS="-Datlas.log.dir=%s -Datlas.log.file=application.log"
-METADATA_COMMAND_OPTS="-Datlas.home=%s"
-METADATA_CONFIG_OPTS="-Datlas.conf=%s"
-DEFAULT_JVM_OPTS="-Xmx1024m -XX:MaxPermSize=512m -Dlog4j.configuration=atlas-log4j.xml"
-CONF_FILE="application.properties"
-HBASE_STORAGE_CONF_ENTRY="atlas.graph.storage.backend\s*=\s*hbase"
+ATLAS_LOG_OPTS="-Datlas.log.dir=%s -Datlas.log.file=%s.log"
+ATLAS_COMMAND_OPTS="-Datlas.home=%s"
+ATLAS_CONFIG_OPTS="-Datlas.conf=%s"
+DEFAULT_JVM_HEAP_OPTS="-Xmx1024m -XX:MaxPermSize=512m"
+DEFAULT_JVM_OPTS="-Dlog4j.configuration=atlas-log4j.xml -Djava.net.preferIPv4Stack=true"
 
 def main():
 
-    metadata_home = mc.metadataDir()
-    confdir = mc.dirMustExist(mc.confDir(metadata_home))
+    is_setup = (len(sys.argv)>1) and sys.argv[1] is not None and sys.argv[1] == '-setup'
+
+    atlas_home = mc.atlasDir()
+    confdir = mc.dirMustExist(mc.confDir(atlas_home))
     mc.executeEnvSh(confdir)
-    logdir = mc.dirMustExist(mc.logDir(metadata_home))
+    logdir = mc.dirMustExist(mc.logDir(atlas_home))
+    mc.dirMustExist(mc.dataDir(atlas_home))
+    if mc.isCygwin():
+        # Pathnames that are passed to JVM must be converted to Windows format.
+        jvm_atlas_home = mc.convertCygwinPath(atlas_home)
+        jvm_confdir = mc.convertCygwinPath(confdir)
+        jvm_logdir = mc.convertCygwinPath(logdir)
+    else:
+        jvm_atlas_home = atlas_home
+        jvm_confdir = confdir
+        jvm_logdir = logdir
 
     #create sys property for conf dirs
-    jvm_opts_list = (METADATA_LOG_OPTS % logdir).split()
+    if not is_setup:
+        jvm_opts_list = (ATLAS_LOG_OPTS % (jvm_logdir, "application")).split()
+    else:
+        jvm_opts_list = (ATLAS_LOG_OPTS % (jvm_logdir, "atlas_setup")).split()
 
-    cmd_opts = (METADATA_COMMAND_OPTS % metadata_home)
+    cmd_opts = (ATLAS_COMMAND_OPTS % jvm_atlas_home)
     jvm_opts_list.extend(cmd_opts.split())
 
-    config_opts = (METADATA_CONFIG_OPTS % confdir)
+    config_opts = (ATLAS_CONFIG_OPTS % jvm_confdir)
     jvm_opts_list.extend(config_opts.split())
 
-    default_jvm_opts = DEFAULT_JVM_OPTS
-    metadata_jvm_opts = os.environ.get(mc.METADATA_OPTS, default_jvm_opts)
-    jvm_opts_list.extend(metadata_jvm_opts.split())
+    atlas_server_heap_opts = os.environ.get(mc.ATLAS_SERVER_HEAP, DEFAULT_JVM_HEAP_OPTS)
+    jvm_opts_list.extend(atlas_server_heap_opts.split())
+
+    atlas_server_jvm_opts = os.environ.get(mc.ATLAS_SERVER_OPTS)
+    if atlas_server_jvm_opts:
+        jvm_opts_list.extend(atlas_server_jvm_opts.split())
+
+    atlas_jvm_opts = os.environ.get(mc.ATLAS_OPTS, DEFAULT_JVM_OPTS)
+    jvm_opts_list.extend(atlas_jvm_opts.split())
 
     #expand web app dir
-    web_app_dir = mc.webAppDir(metadata_home)
-    mc.expandWebApp(metadata_home)
-
-    #add hbase-site.xml to classpath
-    hbase_conf_dir = mc.hbaseConfDir(confdir)
+    web_app_dir = mc.webAppDir(atlas_home)
+    mc.expandWebApp(atlas_home)
 
     p = os.pathsep
-    metadata_classpath = confdir + p \
+    atlas_classpath = confdir + p \
                        + os.path.join(web_app_dir, "atlas", "WEB-INF", "classes" ) + p \
-                       + os.path.join(web_app_dir, "atlas", "WEB-INF", "lib", "atlas-titan-${project.version}.jar" ) + p \
                        + os.path.join(web_app_dir, "atlas", "WEB-INF", "lib", "*" )  + p \
-                       + os.path.join(metadata_home, "libext", "*")
-    if os.path.exists(hbase_conf_dir):
-        metadata_classpath = metadata_classpath + p \
+                       + os.path.join(atlas_home, "libext", "*")
+
+    is_hbase = mc.is_hbase(confdir)
+
+    if is_hbase:
+        #add hbase-site.xml to classpath
+        hbase_conf_dir = mc.hbaseConfDir(atlas_home)
+
+        if os.path.exists(hbase_conf_dir):
+            atlas_classpath = atlas_classpath + p \
                             + hbase_conf_dir
-    else: 
-       storage_backend = mc.grep(os.path.join(confdir, CONF_FILE), HBASE_STORAGE_CONF_ENTRY)
-       if storage_backend != None:
-	   raise Exception("Could not find hbase-site.xml in %s. Please set env var HBASE_CONF_DIR to the hbase client conf dir", hbase_conf_dir)
-    
-    metadata_pid_file = mc.pidFile(metadata_home)
-    
-            
-    if os.path.isfile(metadata_pid_file):
+        else:
+            if mc.is_hbase(confdir):
+                raise Exception("Could not find hbase-site.xml in %s. Please set env var HBASE_CONF_DIR to the hbase client conf dir", hbase_conf_dir)
+
+    if mc.isCygwin():
+        atlas_classpath = mc.convertCygwinPath(atlas_classpath, True)
+
+    atlas_pid_file = mc.pidFile(atlas_home)
+
+    if os.path.isfile(atlas_pid_file):
        #Check if process listed in atlas.pid file is still running
-       pf = file(metadata_pid_file, 'r')
+       pf = file(atlas_pid_file, 'r')
        pid = pf.read().strip()
-       pf.close() 
-       
+       pf.close()
 
-       if  mc.ON_POSIX:
-            
-            if mc.unix_exist_pid((int)(pid)):
-                mc.server_already_running(pid)
-            else:
-                 mc.server_pid_not_running(pid)
-              
-              
+       if mc.exist_pid((int)(pid)):
+           if is_setup:
+               print "Cannot run setup when server is running."
+           mc.server_already_running(pid)
        else:
-            if mc.IS_WINDOWS:
-                if mc.win_exist_pid(pid):
-                   mc.server_already_running(pid)
-                else:
-                     mc.server_pid_not_running(pid)
-                   
-            else:
-                #os other than nt or posix - not supported - need to delete the file to restart server if pid no longer exist
-                mc.server_already_running(pid)
-             
+           mc.server_pid_not_running(pid)
+
+    if is_hbase and mc.is_hbase_local(confdir):
+        print "configured for local hbase."
+        mc.configure_hbase(atlas_home)
+        mc.run_hbase_action(mc.hbaseBinDir(atlas_home), "start", hbase_conf_dir, logdir)
+        print "hbase started."
+
+    #solr setup
+    if mc.is_solr_local(confdir):
+        print "configured for local solr."
+        mc.run_solr(mc.solrBinDir(atlas_home), "start", mc.get_solr_zk_url(confdir), mc.solrPort(), logdir)
+        print "solr started."
+
+        print "setting up solr collections..."
+        mc.create_solr_collection(mc.solrBinDir(atlas_home), mc.solrConfDir(atlas_home), "vertex_index", logdir)
+        mc.create_solr_collection(mc.solrBinDir(atlas_home), mc.solrConfDir(atlas_home), "edge_index", logdir)
+        mc.create_solr_collection(mc.solrBinDir(atlas_home), mc.solrConfDir(atlas_home), "fulltext_index", logdir)
+
+    web_app_path = os.path.join(web_app_dir, "atlas")
+    if (mc.isCygwin()):
+        web_app_path = mc.convertCygwinPath(web_app_path)
+    if not is_setup:
+        start_atlas_server(atlas_classpath, atlas_pid_file, jvm_logdir, jvm_opts_list, web_app_path)
+    else:
+        process = mc.java("org.apache.atlas.web.setup.AtlasSetup", [], atlas_classpath, jvm_opts_list, jvm_logdir)
+        return process.wait()
 
 
-    args = ["-app", os.path.join(web_app_dir, "atlas")]
+def start_atlas_server(atlas_classpath, atlas_pid_file, jvm_logdir, jvm_opts_list, web_app_path):
+    args = ["-app", web_app_path]
     args.extend(sys.argv[1:])
-
-    process = mc.java("org.apache.atlas.Atlas", args, metadata_classpath, jvm_opts_list, logdir)
-    mc.writePid(metadata_pid_file, process)
-
+    process = mc.java("org.apache.atlas.Atlas", args, atlas_classpath, jvm_opts_list, jvm_logdir)
+    mc.writePid(atlas_pid_file, process)
     print "Apache Atlas Server started!!!\n"
+
 
 if __name__ == '__main__':
     try:

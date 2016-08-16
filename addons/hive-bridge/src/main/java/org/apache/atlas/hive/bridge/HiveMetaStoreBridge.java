@@ -18,110 +18,125 @@
 
 package org.apache.atlas.hive.bridge;
 
+import com.google.common.annotations.VisibleForTesting;
+import com.sun.jersey.api.client.ClientResponse;
 import org.apache.atlas.ApplicationProperties;
 import org.apache.atlas.AtlasClient;
+import org.apache.atlas.AtlasConstants;
 import org.apache.atlas.AtlasServiceException;
+import org.apache.atlas.fs.model.FSDataModel;
+import org.apache.atlas.fs.model.FSDataTypes;
+import org.apache.atlas.hive.hook.HiveHook;
 import org.apache.atlas.hive.model.HiveDataModelGenerator;
 import org.apache.atlas.hive.model.HiveDataTypes;
 import org.apache.atlas.typesystem.Referenceable;
 import org.apache.atlas.typesystem.Struct;
 import org.apache.atlas.typesystem.json.InstanceSerialization;
+import org.apache.atlas.typesystem.json.TypesSerialization;
+import org.apache.atlas.typesystem.persistence.Id;
+import org.apache.atlas.utils.AuthenticationUtil;
+import org.apache.commons.cli.BasicParser;
+import org.apache.commons.cli.CommandLine;
+import org.apache.commons.cli.CommandLineParser;
+import org.apache.commons.cli.Options;
 import org.apache.commons.configuration.Configuration;
-import org.apache.commons.lang.StringUtils;
+import org.apache.commons.lang.RandomStringUtils;
+import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.conf.HiveConf;
+import org.apache.hadoop.hive.metastore.TableType;
 import org.apache.hadoop.hive.metastore.api.Database;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.metastore.api.Order;
 import org.apache.hadoop.hive.metastore.api.SerDeInfo;
 import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
-import org.apache.hadoop.hive.metastore.api.hive_metastoreConstants;
 import org.apache.hadoop.hive.ql.metadata.Hive;
 import org.apache.hadoop.hive.ql.metadata.HiveException;
-import org.apache.hadoop.hive.ql.metadata.Partition;
 import org.apache.hadoop.hive.ql.metadata.Table;
+import org.apache.hadoop.hive.ql.session.SessionState;
 import org.apache.hadoop.security.UserGroupInformation;
-import org.codehaus.jettison.json.JSONArray;
-import org.codehaus.jettison.json.JSONException;
-import org.codehaus.jettison.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
 
 /**
  * A Bridge Utility that imports metadata from the Hive Meta Store
- * and registers then in Atlas.
+ * and registers them in Atlas.
  */
 public class HiveMetaStoreBridge {
     private static final String DEFAULT_DGI_URL = "http://localhost:21000/";
     public static final String HIVE_CLUSTER_NAME = "atlas.cluster.name";
     public static final String DEFAULT_CLUSTER_NAME = "primary";
+    public static final String DESCRIPTION_ATTR = "description";
+
+    public static final String TEMP_TABLE_PREFIX = "_temp-";
+
     private final String clusterName;
+    public static final long MILLIS_CONVERT_FACTOR = 1000;
 
     public static final String ATLAS_ENDPOINT = "atlas.rest.address";
 
     private static final Logger LOG = LoggerFactory.getLogger(HiveMetaStoreBridge.class);
 
     public final Hive hiveClient;
-    private final AtlasClient atlasClient;
+    private AtlasClient atlasClient = null;
 
-    public HiveMetaStoreBridge(HiveConf hiveConf, Configuration atlasConf) throws Exception {
-        this(hiveConf, atlasConf, null, null);
+    HiveMetaStoreBridge(String clusterName, Hive hiveClient, AtlasClient atlasClient) {
+        this.clusterName = clusterName;
+        this.hiveClient = hiveClient;
+        this.atlasClient = atlasClient;
+    }
+
+    public String getClusterName() {
+        return clusterName;
     }
 
     /**
      * Construct a HiveMetaStoreBridge.
-     * @param hiveConf hive conf
+     * @param hiveConf {@link HiveConf} for Hive component in the cluster
      */
-    public HiveMetaStoreBridge(HiveConf hiveConf, Configuration atlasConf, String doAsUser,
-                               UserGroupInformation ugi) throws Exception {
-        clusterName = hiveConf.get(HIVE_CLUSTER_NAME, DEFAULT_CLUSTER_NAME);
-        hiveClient = Hive.get(hiveConf);
-
-        atlasClient = new AtlasClient(atlasConf.getString(ATLAS_ENDPOINT, DEFAULT_DGI_URL), ugi, doAsUser);
+    public HiveMetaStoreBridge(Configuration atlasProperties, HiveConf hiveConf) throws Exception {
+        this(atlasProperties, hiveConf, null);
     }
 
-    public AtlasClient getAtlasClient() {
+    /**
+     * Construct a HiveMetaStoreBridge.
+     * @param hiveConf {@link HiveConf} for Hive component in the cluster
+     */
+    public HiveMetaStoreBridge(Configuration atlasProperties, HiveConf hiveConf, AtlasClient atlasClient) throws Exception {
+        this(atlasProperties.getString(HIVE_CLUSTER_NAME, DEFAULT_CLUSTER_NAME), Hive.get(hiveConf), atlasClient);
+    }
+
+    AtlasClient getAtlasClient() {
         return atlasClient;
     }
 
-    public void importHiveMetadata() throws Exception {
+    void importHiveMetadata(boolean failOnError) throws Exception {
         LOG.info("Importing hive metadata");
-        importDatabases();
+        importDatabases(failOnError);
     }
 
-    private void importDatabases() throws Exception {
+    private void importDatabases(boolean failOnError) throws Exception {
         List<String> databases = hiveClient.getAllDatabases();
         for (String databaseName : databases) {
             Referenceable dbReference = registerDatabase(databaseName);
 
-            importTables(dbReference, databaseName);
+            if (dbReference != null) {
+                importTables(dbReference, databaseName, failOnError);
+            }
         }
     }
 
     /**
-     * Creates db entity
-     * @param hiveDB
-     * @return
+     * Create a Hive Database entity
+     * @param hiveDB The Hive {@link Database} object from which to map properties
+     * @return new Hive Database entity
      * @throws HiveException
      */
     public Referenceable createDBInstance(Database hiveDB) throws HiveException {
-        LOG.info("Importing objects from databaseName : " + hiveDB.getName());
-
-        Referenceable dbRef = new Referenceable(HiveDataTypes.HIVE_DB.getName());
-        String dbName = hiveDB.getName().toLowerCase();
-        dbRef.set(AtlasClient.REFERENCEABLE_ATTRIBUTE_NAME, getDBQualifiedName(clusterName, dbName));
-        dbRef.set(HiveDataModelGenerator.NAME, dbName);
-        dbRef.set(HiveDataModelGenerator.CLUSTER_NAME, clusterName);
-        dbRef.set("description", hiveDB.getDescription());
-        dbRef.set("locationUri", hiveDB.getLocationUri());
-        dbRef.set("parameters", hiveDB.getParameters());
-        dbRef.set("ownerName", hiveDB.getOwnerName());
-        if (hiveDB.getOwnerType() != null) {
-            dbRef.set("ownerType", hiveDB.getOwnerType().getValue());
-        }
-        return dbRef;
+        return createOrUpdateDBInstance(hiveDB, null);
     }
 
     /**
@@ -132,12 +147,37 @@ public class HiveMetaStoreBridge {
      */
     private Referenceable registerDatabase(String databaseName) throws Exception {
         Referenceable dbRef = getDatabaseReference(clusterName, databaseName);
+        Database db = hiveClient.getDatabase(databaseName);
+
+        if (db != null) {
+            if (dbRef == null) {
+                dbRef = createDBInstance(db);
+                dbRef = registerInstance(dbRef);
+            } else {
+                LOG.info("Database {} is already registered with id {}. Updating it.", databaseName, dbRef.getId().id);
+                dbRef = createOrUpdateDBInstance(db, dbRef);
+                updateInstance(dbRef);
+            }
+        }
+        return dbRef;
+    }
+
+    private Referenceable createOrUpdateDBInstance(Database hiveDB, Referenceable dbRef) {
+        LOG.info("Importing objects from databaseName : " + hiveDB.getName());
+
         if (dbRef == null) {
-            Database db = hiveClient.getDatabase(databaseName);
-            dbRef = createDBInstance(db);
-            dbRef = registerInstance(dbRef);
-        } else {
-            LOG.info("Database {} is already registered with id {}", databaseName, dbRef.getId().id);
+            dbRef = new Referenceable(HiveDataTypes.HIVE_DB.getName());
+        }
+        String dbName = hiveDB.getName().toLowerCase();
+        dbRef.set(AtlasClient.REFERENCEABLE_ATTRIBUTE_NAME, getDBQualifiedName(clusterName, dbName));
+        dbRef.set(AtlasClient.NAME, dbName);
+        dbRef.set(AtlasConstants.CLUSTER_NAME_ATTRIBUTE, clusterName);
+        dbRef.set(DESCRIPTION_ATTR, hiveDB.getDescription());
+        dbRef.set(HiveDataModelGenerator.LOCATION, hiveDB.getLocationUri());
+        dbRef.set(HiveDataModelGenerator.PARAMETERS, hiveDB.getParameters());
+        dbRef.set(AtlasClient.OWNER, hiveDB.getOwnerName());
+        if (hiveDB.getOwnerType() != null) {
+            dbRef.set("ownerType", hiveDB.getOwnerType().getValue());
         }
         return dbRef;
     }
@@ -148,16 +188,16 @@ public class HiveMetaStoreBridge {
      * @return
      * @throws Exception
      */
-    public Referenceable registerInstance(Referenceable referenceable) throws Exception {
+    private Referenceable registerInstance(Referenceable referenceable) throws Exception {
         String typeName = referenceable.getTypeName();
         LOG.debug("creating instance of type " + typeName);
 
         String entityJSON = InstanceSerialization.toJson(referenceable, true);
         LOG.debug("Submitting new entity {} = {}", referenceable.getTypeName(), entityJSON);
-        JSONArray guids = atlasClient.createEntity(entityJSON);
+        List<String> guids = getAtlasClient().createEntity(entityJSON);
         LOG.debug("created instance for type " + typeName + ", guid: " + guids);
 
-        return new Referenceable(guids.getString(0), referenceable.getTypeName(), null);
+        return new Referenceable(guids.get(guids.size() - 1), referenceable.getTypeName(), null);
     }
 
     /**
@@ -171,233 +211,303 @@ public class HiveMetaStoreBridge {
         LOG.debug("Getting reference for database {}", databaseName);
         String typeName = HiveDataTypes.HIVE_DB.getName();
 
-        String dslQuery = String.format("%s where %s = '%s' and %s = '%s'", typeName, HiveDataModelGenerator.NAME,
-                databaseName.toLowerCase(), HiveDataModelGenerator.CLUSTER_NAME, clusterName);
-        return getEntityReferenceFromDSL(typeName, dslQuery);
+        return getEntityReference(typeName, getDBQualifiedName(clusterName, databaseName));
     }
 
-    private Referenceable getEntityReferenceFromDSL(String typeName, String dslQuery) throws Exception {
-        AtlasClient dgiClient = getAtlasClient();
-        JSONArray results = dgiClient.searchByDSL(dslQuery);
-        if (results.length() == 0) {
-            return null;
-        } else {
-            String guid;
-            JSONObject row = results.getJSONObject(0);
-            if (row.has("$id$")) {
-                guid = row.getJSONObject("$id$").getString("id");
-            } else {
-                guid = row.getJSONObject("_col_0").getString("id");
-            }
-            return new Referenceable(guid, typeName, null);
-        }
-    }
-
+    /**
+     * Construct the qualified name used to uniquely identify a Database instance in Atlas.
+     * @param clusterName Name of the cluster to which the Hive component belongs
+     * @param dbName Name of the Hive database
+     * @return Unique qualified name to identify the Database instance in Atlas.
+     */
     public static String getDBQualifiedName(String clusterName, String dbName) {
         return String.format("%s@%s", dbName.toLowerCase(), clusterName);
     }
 
+    private String getCreateTableString(Table table, String location){
+        String colString = "";
+        List<FieldSchema> colList = table.getAllCols();
+        if ( colList != null) {
+            for (FieldSchema col : colList) {
+                colString += col.getName() + " " + col.getType() + ",";
+            }
+            if (colList.size() > 0) {
+                colString = colString.substring(0, colString.length() - 1);
+                colString = "(" + colString + ")";
+            }
+        }
+        String query = "create external table " + table.getTableName() +  colString +
+                " location '" + location + "'";
+        return query;
+    }
+
     /**
      * Imports all tables for the given db
-     * @param databaseName
      * @param databaseReferenceable
+     * @param databaseName
+     * @param failOnError
      * @throws Exception
      */
-    private void importTables(Referenceable databaseReferenceable, String databaseName) throws Exception {
+    private int importTables(Referenceable databaseReferenceable, String databaseName, final boolean failOnError) throws Exception {
+        int tablesImported = 0;
         List<String> hiveTables = hiveClient.getAllTables(databaseName);
-
+        LOG.info("Importing tables {} for db {}", hiveTables.toString(), databaseName);
         for (String tableName : hiveTables) {
+            int imported = importTable(databaseReferenceable, databaseName, tableName, failOnError);
+            tablesImported += imported;
+        }
+
+        if (tablesImported == hiveTables.size()) {
+            LOG.info("Successfully imported all {} tables from {} ", tablesImported, databaseName);
+        } else {
+            LOG.error("Able to import {} tables out of {} tables from {}. Please check logs for import errors", tablesImported, hiveTables.size(), databaseName);
+        }
+
+        return tablesImported;
+    }
+
+    @VisibleForTesting
+    public int importTable(Referenceable databaseReferenceable, String databaseName, String tableName, final boolean failOnError) throws Exception {
+        try {
             Table table = hiveClient.getTable(databaseName, tableName);
             Referenceable tableReferenceable = registerTable(databaseReferenceable, table);
-
-            // Import Partitions
-            Referenceable sdReferenceable = getSDForTable(databaseName, tableName);
-            registerPartitions(tableReferenceable, sdReferenceable, table);
+            if (table.getTableType() == TableType.EXTERNAL_TABLE) {
+                String tableQualifiedName = getTableProcessQualifiedName(clusterName, table);
+                Referenceable process = getProcessReference(tableQualifiedName);
+                if (process == null) {
+                    LOG.info("Attempting to register create table process for {}", tableQualifiedName);
+                    Referenceable lineageProcess = new Referenceable(HiveDataTypes.HIVE_PROCESS.getName());
+                    ArrayList<Referenceable> sourceList = new ArrayList<>();
+                    ArrayList<Referenceable> targetList = new ArrayList<>();
+                    String tableLocation = table.getDataLocation().toString();
+                    Referenceable path = fillHDFSDataSet(tableLocation);
+                    String query = getCreateTableString(table, tableLocation);
+                    sourceList.add(path);
+                    targetList.add(tableReferenceable);
+                    lineageProcess.set("inputs", sourceList);
+                    lineageProcess.set("outputs", targetList);
+                    lineageProcess.set("userName", table.getOwner());
+                    lineageProcess.set("startTime", new Date(System.currentTimeMillis()));
+                    lineageProcess.set("endTime", new Date(System.currentTimeMillis()));
+                    lineageProcess.set("operationType", "CREATETABLE");
+                    lineageProcess.set("queryText", query);
+                    lineageProcess.set("queryId", query);
+                    lineageProcess.set("queryPlan", "{}");
+                    lineageProcess.set("clusterName", clusterName);
+                    List<String> recentQueries = new ArrayList<>(1);
+                    recentQueries.add(query);
+                    lineageProcess.set("recentQueries", recentQueries);
+                    String processQualifiedName = getTableProcessQualifiedName(clusterName, table);
+                    lineageProcess.set(AtlasClient.REFERENCEABLE_ATTRIBUTE_NAME, processQualifiedName);
+                    lineageProcess.set(AtlasClient.NAME, query);
+                    registerInstance(lineageProcess);
+                } else {
+                    LOG.info("Process {} is already registered", process.toString());
+                }
+            }
+            return 1;
+        } catch (Exception e) {
+            LOG.error("Import failed for hive_table {} ", tableName, e);
+            if (failOnError) {
+                throw e;
+            }
+            return 0;
         }
     }
 
     /**
      * Gets reference for the table
      *
-     * @param dbName database name
-     * @param tableName table name
+     * @param hiveTable
      * @return table reference if exists, else null
      * @throws Exception
      */
-    private Referenceable getTableReference(String dbName, String tableName) throws Exception {
-        LOG.debug("Getting reference for table {}.{}", dbName, tableName);
+    private Referenceable getTableReference(Table hiveTable)  throws Exception {
+        LOG.debug("Getting reference for table {}.{}", hiveTable.getDbName(), hiveTable.getTableName());
 
         String typeName = HiveDataTypes.HIVE_TABLE.getName();
-        String entityName = getTableQualifiedName(clusterName, dbName, tableName);
-        String dslQuery = String.format("%s as t where name = '%s'", typeName, entityName);
-        return getEntityReferenceFromDSL(typeName, dslQuery);
+        String tblQualifiedName = getTableQualifiedName(getClusterName(), hiveTable.getDbName(), hiveTable.getTableName());
+        return getEntityReference(typeName, tblQualifiedName);
     }
 
+    private Referenceable getEntityReference(final String typeName, final String tblQualifiedName) throws AtlasServiceException {
+        AtlasClient dgiClient = getAtlasClient();
+        try {
+            return dgiClient.getEntity(typeName, AtlasClient.REFERENCEABLE_ATTRIBUTE_NAME, tblQualifiedName);
+        } catch (AtlasServiceException e) {
+            if(e.getStatus() == ClientResponse.Status.NOT_FOUND) {
+                return null;
+            }
+            throw e;
+        }
+    }
+
+    private Referenceable getProcessReference(String qualifiedName) throws Exception{
+        LOG.debug("Getting reference for process {}", qualifiedName);
+        String typeName = HiveDataTypes.HIVE_PROCESS.getName();
+        return getEntityReference(typeName, qualifiedName);
+    }
+
+    /**
+     * Construct the qualified name used to uniquely identify a Table instance in Atlas.
+     * @param clusterName Name of the cluster to which the Hive component belongs
+     * @param dbName Name of the Hive database to which the Table belongs
+     * @param tableName Name of the Hive table
+     * @return Unique qualified name to identify the Table instance in Atlas.
+     */
+    public static String getTableQualifiedName(String clusterName, String dbName, String tableName, boolean isTemporaryTable) {
+        String tableTempName = tableName;
+        if (isTemporaryTable) {
+            if (SessionState.get() != null && SessionState.get().getSessionId() != null) {
+                tableTempName = tableName + TEMP_TABLE_PREFIX + SessionState.get().getSessionId();
+            } else {
+                tableTempName = tableName + TEMP_TABLE_PREFIX + RandomStringUtils.random(10);
+            }
+        }
+        return String.format("%s.%s@%s", dbName.toLowerCase(), tableTempName.toLowerCase(), clusterName);
+    }
+
+
+
+    /**
+     * Construct the qualified name used to uniquely identify a Table instance in Atlas.
+     * @param clusterName Name of the cluster to which the Hive component belongs
+     * @param table hive table for which the qualified name is needed
+     * @return Unique qualified name to identify the Table instance in Atlas.
+     */
+    public static String getTableQualifiedName(String clusterName, Table table) {
+        return getTableQualifiedName(clusterName, table.getDbName(), table.getTableName(), table.isTemporary());
+    }
+
+    public static String getTableProcessQualifiedName(String clusterName, Table table) {
+        String tableQualifiedName = getTableQualifiedName(clusterName, table);
+        Date createdTime = getTableCreatedTime(table);
+        return tableQualifiedName + HiveHook.SEP + createdTime.getTime();
+    }
+
+    /**
+     * Construct the qualified name used to uniquely identify a Table instance in Atlas.
+     * @param clusterName Name of the cluster to which the Hive component belongs
+     * @param dbName Name of the Hive database to which the Table belongs
+     * @param tableName Name of the Hive table
+     * @return Unique qualified name to identify the Table instance in Atlas.
+     */
     public static String getTableQualifiedName(String clusterName, String dbName, String tableName) {
-        return String.format("%s.%s@%s", dbName.toLowerCase(), tableName.toLowerCase(), clusterName);
+         return getTableQualifiedName(clusterName, dbName, tableName, false);
     }
 
+    /**
+     * Create a new table instance in Atlas
+     * @param dbReference reference to a created Hive database {@link Referenceable} to which this table belongs
+     * @param hiveTable reference to the Hive {@link Table} from which to map properties
+     * @return Newly created Hive reference
+     * @throws Exception
+     */
     public Referenceable createTableInstance(Referenceable dbReference, Table hiveTable)
             throws Exception {
+        return createOrUpdateTableInstance(dbReference, null, hiveTable);
+    }
+
+    public static Date getTableCreatedTime(Table table) {
+        return new Date(table.getTTable().getCreateTime() * MILLIS_CONVERT_FACTOR);
+    }
+
+    private Referenceable createOrUpdateTableInstance(Referenceable dbReference, Referenceable tableReference,
+                                                      final Table hiveTable) throws Exception {
         LOG.info("Importing objects from {}.{}", hiveTable.getDbName(), hiveTable.getTableName());
 
-        Referenceable tableRef = new Referenceable(HiveDataTypes.HIVE_TABLE.getName());
-        String tableQualifiedName = getTableQualifiedName(clusterName, hiveTable.getDbName(), hiveTable.getTableName());
-        tableRef.set(HiveDataModelGenerator.NAME, tableQualifiedName);
-        tableRef.set(HiveDataModelGenerator.TABLE_NAME, hiveTable.getTableName().toLowerCase());
-        tableRef.set("owner", hiveTable.getOwner());
+        if (tableReference == null) {
+            tableReference = new Referenceable(HiveDataTypes.HIVE_TABLE.getName());
+        }
 
-        tableRef.set("createTime", hiveTable.getMetadata().getProperty(hive_metastoreConstants.DDL_TIME));
-        tableRef.set("lastAccessTime", hiveTable.getLastAccessTime());
-        tableRef.set("retention", hiveTable.getRetention());
+        String tableQualifiedName = getTableQualifiedName(clusterName, hiveTable);
+        tableReference.set(AtlasClient.REFERENCEABLE_ATTRIBUTE_NAME, tableQualifiedName);
+        tableReference.set(AtlasClient.NAME, hiveTable.getTableName().toLowerCase());
+        tableReference.set(AtlasClient.OWNER, hiveTable.getOwner());
 
-        tableRef.set(HiveDataModelGenerator.COMMENT, hiveTable.getParameters().get(HiveDataModelGenerator.COMMENT));
+        Date createDate = new Date();
+        if (hiveTable.getTTable() != null){
+            try {
+                createDate = getTableCreatedTime(hiveTable);
+                LOG.debug("Setting create time to {} ", createDate);
+                tableReference.set(HiveDataModelGenerator.CREATE_TIME, createDate);
+            } catch(Exception ne) {
+                LOG.error("Error while setting createTime for the table {} ", hiveTable.getCompleteName(), ne);
+            }
+        }
+
+        Date lastAccessTime = createDate;
+        if ( hiveTable.getLastAccessTime() > 0) {
+            lastAccessTime = new Date(hiveTable.getLastAccessTime() * MILLIS_CONVERT_FACTOR);
+        }
+        tableReference.set(HiveDataModelGenerator.LAST_ACCESS_TIME, lastAccessTime);
+        tableReference.set("retention", hiveTable.getRetention());
+
+        tableReference.set(HiveDataModelGenerator.COMMENT, hiveTable.getParameters().get(HiveDataModelGenerator.COMMENT));
 
         // add reference to the database
-        tableRef.set(HiveDataModelGenerator.DB, dbReference);
-
-        tableRef.set("columns", getColumns(hiveTable.getCols(), tableQualifiedName));
+        tableReference.set(HiveDataModelGenerator.DB, dbReference);
 
         // add reference to the StorageDescriptor
-        Referenceable sdReferenceable = fillStorageDescStruct(hiveTable.getSd(), tableQualifiedName, tableQualifiedName);
-        tableRef.set("sd", sdReferenceable);
+        Referenceable sdReferenceable = fillStorageDesc(hiveTable.getSd(), tableQualifiedName, getStorageDescQFName(tableQualifiedName), tableReference.getId());
+        tableReference.set(HiveDataModelGenerator.STORAGE_DESC, sdReferenceable);
 
-        // add reference to the Partition Keys
-        List<Referenceable> partKeys = getColumns(hiveTable.getPartitionKeys(), tableQualifiedName);
-        tableRef.set("partitionKeys", partKeys);
-
-        tableRef.set("parameters", hiveTable.getParameters());
+        tableReference.set(HiveDataModelGenerator.PARAMETERS, hiveTable.getParameters());
 
         if (hiveTable.getViewOriginalText() != null) {
-            tableRef.set("viewOriginalText", hiveTable.getViewOriginalText());
+            tableReference.set("viewOriginalText", hiveTable.getViewOriginalText());
         }
 
         if (hiveTable.getViewExpandedText() != null) {
-            tableRef.set("viewExpandedText", hiveTable.getViewExpandedText());
+            tableReference.set("viewExpandedText", hiveTable.getViewExpandedText());
         }
 
-        tableRef.set("tableType", hiveTable.getTableType().name());
-        tableRef.set("temporary", hiveTable.isTemporary());
-        return tableRef;
+        tableReference.set(HiveDataModelGenerator.TABLE_TYPE_ATTR, hiveTable.getTableType().name());
+        tableReference.set("temporary", hiveTable.isTemporary());
+
+        // add reference to the Partition Keys
+        List<Referenceable> partKeys = getColumns(hiveTable.getPartitionKeys(), tableReference);
+        tableReference.set("partitionKeys", partKeys);
+
+        tableReference.set(HiveDataModelGenerator.COLUMNS, getColumns(hiveTable.getCols(), tableReference));
+
+        return tableReference;
+    }
+
+    public static String getStorageDescQFName(String entityQualifiedName) {
+        return entityQualifiedName + "_storage";
     }
 
     private Referenceable registerTable(Referenceable dbReference, Table table) throws Exception {
         String dbName = table.getDbName();
         String tableName = table.getTableName();
         LOG.info("Attempting to register table [" + tableName + "]");
-        Referenceable tableRef = getTableReference(dbName, tableName);
-        if (tableRef == null) {
-            tableRef = createTableInstance(dbReference, table);
-            tableRef = registerInstance(tableRef);
+        Referenceable tableReference = getTableReference(table);
+        LOG.info("Found result " + tableReference);
+        if (tableReference == null) {
+            tableReference = createTableInstance(dbReference, table);
+            tableReference = registerInstance(tableReference);
         } else {
-            LOG.info("Table {}.{} is already registered with id {}", dbName, tableName, tableRef.getId().id);
+            LOG.info("Table {}.{} is already registered with id {}. Updating entity.", dbName, tableName,
+                    tableReference.getId().id);
+            tableReference = createOrUpdateTableInstance(dbReference, tableReference, table);
+            updateInstance(tableReference);
         }
-        return tableRef;
+        return tableReference;
     }
 
+    private void updateInstance(Referenceable referenceable) throws AtlasServiceException {
+        String typeName = referenceable.getTypeName();
+        LOG.debug("updating instance of type " + typeName);
 
-    private Referenceable getEntityReferenceFromGremlin(String typeName, String gremlinQuery)
-    throws AtlasServiceException, JSONException {
-        AtlasClient client = getAtlasClient();
-        JSONArray results = client.searchByGremlin(gremlinQuery);
-        if (results.length() == 0) {
-            return null;
-        }
-        String guid = results.getJSONObject(0).getString("__guid");
-        return new Referenceable(guid, typeName, null);
+        String entityJSON = InstanceSerialization.toJson(referenceable, true);
+        LOG.debug("Updating entity {} = {}", referenceable.getTypeName(), entityJSON);
+
+        atlasClient.updateEntity(referenceable.getId().id, referenceable);
     }
 
-    private Referenceable getPartitionReference(String dbName, String tableName, List<String> values) throws Exception {
-        String valuesStr = "['" + StringUtils.join(values, "', '") + "']";
-        LOG.debug("Getting reference for partition for {}.{} with values {}", dbName, tableName, valuesStr);
-        String typeName = HiveDataTypes.HIVE_PARTITION.getName();
-
-        //todo replace gremlin with DSL
-        //        String dslQuery = String.format("%s as p where values = %s, tableName where name = '%s', "
-        //                        + "dbName where name = '%s' and clusterName = '%s' select p", typeName, valuesStr,
-        // tableName,
-        //                dbName, clusterName);
-
-        String datasetType = AtlasClient.DATA_SET_SUPER_TYPE;
-        String tableEntityName = getTableQualifiedName(clusterName, dbName, tableName);
-
-        String gremlinQuery = String.format("g.V.has('__typeName', '%s').has('%s.values', %s).as('p')."
-                        + "out('__%s.table').has('%s.name', '%s').back('p').toList()", typeName, typeName, valuesStr,
-                typeName, datasetType, tableEntityName);
-
-        return getEntityReferenceFromGremlin(typeName, gremlinQuery);
-    }
-
-    private Referenceable getSDForTable(String dbName, String tableName) throws Exception {
-        Referenceable tableRef = getTableReference(dbName, tableName);
-        if (tableRef == null) {
-            throw new IllegalArgumentException("Table " + dbName + "." + tableName + " doesn't exist");
-        }
-
-        AtlasClient dgiClient = getAtlasClient();
-        Referenceable tableInstance = dgiClient.getEntity(tableRef.getId().id);
-        Referenceable sd = (Referenceable) tableInstance.get("sd");
-        return new Referenceable(sd.getId().id, sd.getTypeName(), null);
-    }
-
-    private void registerPartitions(Referenceable tableReferenceable, Referenceable sdReferenceable,
-                                    Table table) throws Exception {
-        String dbName = table.getDbName();
-        String tableName = table.getTableName();
-        LOG.info("Registering partitions for {}.{}", dbName, tableName);
-        List<Partition> tableParts = hiveClient.getPartitions(table);
-
-        for (Partition hivePart : tableParts) {
-            registerPartition(tableReferenceable, sdReferenceable, hivePart);
-        }
-    }
-
-    private Referenceable registerPartition(Referenceable tableReferenceable, Referenceable sdReferenceable,
-                                            Partition hivePart) throws Exception {
-        LOG.info("Registering partition for {} with values {}", tableReferenceable,
-                StringUtils.join(hivePart.getValues(), ","));
-        String dbName = hivePart.getTable().getDbName();
-        String tableName = hivePart.getTable().getTableName();
-
-        Referenceable partRef = getPartitionReference(dbName, tableName, hivePart.getValues());
-        if (partRef == null) {
-            partRef = createPartitionReferenceable(tableReferenceable, sdReferenceable, hivePart);
-            partRef = registerInstance(partRef);
-        } else {
-            LOG.info("Partition {}.{} with values {} is already registered with id {}", dbName, tableName,
-                    StringUtils.join(hivePart.getValues(), ","), partRef.getId().id);
-        }
-        return partRef;
-    }
-
-    public Referenceable createPartitionReferenceable(Referenceable tableReferenceable, Referenceable sdReferenceable,
-                                                      Partition hivePart) {
-        Referenceable partRef = new Referenceable(HiveDataTypes.HIVE_PARTITION.getName());
-        partRef.set(AtlasClient.REFERENCEABLE_ATTRIBUTE_NAME, getPartitionQualifiedName(hivePart));
-        partRef.set("values", hivePart.getValues());
-
-        partRef.set(HiveDataModelGenerator.TABLE, tableReferenceable);
-
-        //todo fix
-        partRef.set("createTime", hivePart.getLastAccessTime());
-        partRef.set("lastAccessTime", hivePart.getLastAccessTime());
-
-        // sdStruct = fillStorageDescStruct(hivePart.getSd());
-        // Instead of creating copies of the sdstruct for partitions we are reusing existing
-        // ones will fix to identify partitions with differing schema.
-        partRef.set("sd", sdReferenceable);
-
-        partRef.set("parameters", hivePart.getParameters());
-        return partRef;
-    }
-
-    private String getPartitionQualifiedName(Partition partition) {
-        return String.format("%s.%s.%s@%s", partition.getTable().getDbName(),
-                partition.getTable().getTableName(), StringUtils.join(partition.getValues(), "-"), clusterName);
-    }
-
-    private Referenceable fillStorageDescStruct(StorageDescriptor storageDesc, String tableQualifiedName,
-                                                String sdQualifiedName) throws Exception {
+    public Referenceable fillStorageDesc(StorageDescriptor storageDesc, String tableQualifiedName,
+        String sdQualifiedName, Id tableId) throws Exception {
         LOG.debug("Filling storage descriptor information for " + storageDesc);
 
         Referenceable sdReferenceable = new Referenceable(HiveDataTypes.HIVE_STORAGEDESC.getName());
@@ -410,20 +520,14 @@ public class HiveMetaStoreBridge {
         String serdeInfoName = HiveDataTypes.HIVE_SERDE.getName();
         Struct serdeInfoStruct = new Struct(serdeInfoName);
 
-        serdeInfoStruct.set(HiveDataModelGenerator.NAME, serdeInfo.getName());
+        serdeInfoStruct.set(AtlasClient.NAME, serdeInfo.getName());
         serdeInfoStruct.set("serializationLib", serdeInfo.getSerializationLib());
-        serdeInfoStruct.set("parameters", serdeInfo.getParameters());
+        serdeInfoStruct.set(HiveDataModelGenerator.PARAMETERS, serdeInfo.getParameters());
 
         sdReferenceable.set("serdeInfo", serdeInfoStruct);
         sdReferenceable.set(HiveDataModelGenerator.STORAGE_NUM_BUCKETS, storageDesc.getNumBuckets());
         sdReferenceable
                 .set(HiveDataModelGenerator.STORAGE_IS_STORED_AS_SUB_DIRS, storageDesc.isStoredAsSubDirectories());
-
-        //Use the passed column list if not null, ex: use same references for table and SD
-        List<FieldSchema> columns = storageDesc.getCols();
-        if (columns != null && !columns.isEmpty()) {
-            sdReferenceable.set("cols", getColumns(columns, tableQualifiedName));
-        }
 
         List<Struct> sortColsStruct = new ArrayList<>();
         for (Order sortcol : storageDesc.getSortCols()) {
@@ -438,7 +542,7 @@ public class HiveMetaStoreBridge {
             sdReferenceable.set("sortCols", sortColsStruct);
         }
 
-        sdReferenceable.set("location", storageDesc.getLocation());
+        sdReferenceable.set(HiveDataModelGenerator.LOCATION, storageDesc.getLocation());
         sdReferenceable.set("inputFormat", storageDesc.getInputFormat());
         sdReferenceable.set("outputFormat", storageDesc.getOutputFormat());
         sdReferenceable.set("compressed", storageDesc.isCompressed());
@@ -447,52 +551,114 @@ public class HiveMetaStoreBridge {
             sdReferenceable.set("bucketCols", storageDesc.getBucketCols());
         }
 
-        sdReferenceable.set("parameters", storageDesc.getParameters());
+        sdReferenceable.set(HiveDataModelGenerator.PARAMETERS, storageDesc.getParameters());
         sdReferenceable.set("storedAsSubDirectories", storageDesc.isStoredAsSubDirectories());
+        sdReferenceable.set(HiveDataModelGenerator.TABLE, tableId);
 
         return sdReferenceable;
     }
 
-    private String getColumnQualifiedName(String tableQualifiedName, String colName) {
-        String[] parts = tableQualifiedName.split("@");
-        String tableName = parts[0];
-        return String.format("%s.%s@%s", tableName, colName, clusterName);
+    public Referenceable fillHDFSDataSet(String pathUri) {
+        Referenceable ref = new Referenceable(FSDataTypes.HDFS_PATH().toString());
+        ref.set("path", pathUri);
+        Path path = new Path(pathUri);
+        ref.set(AtlasClient.NAME, path.getName());
+        ref.set(AtlasClient.REFERENCEABLE_ATTRIBUTE_NAME, pathUri);
+        return ref;
     }
 
-    private List<Referenceable> getColumns(List<FieldSchema> schemaList, String tableQualifiedName) throws Exception {
+    public static String getColumnQualifiedName(final String tableQualifiedName, final String colName) {
+        final String[] parts = tableQualifiedName.split("@");
+        final String tableName = parts[0];
+        final String clusterName = parts[1];
+        return String.format("%s.%s@%s", tableName, colName.toLowerCase(), clusterName);
+    }
+
+    public List<Referenceable> getColumns(List<FieldSchema> schemaList, Referenceable tableReference) throws Exception {
         List<Referenceable> colList = new ArrayList<>();
+
         for (FieldSchema fs : schemaList) {
             LOG.debug("Processing field " + fs);
             Referenceable colReferenceable = new Referenceable(HiveDataTypes.HIVE_COLUMN.getName());
             colReferenceable.set(AtlasClient.REFERENCEABLE_ATTRIBUTE_NAME,
-                    getColumnQualifiedName(tableQualifiedName, fs.getName()));
-            colReferenceable.set(HiveDataModelGenerator.NAME, fs.getName());
+                    getColumnQualifiedName((String) tableReference.get(AtlasClient.REFERENCEABLE_ATTRIBUTE_NAME), fs.getName()));
+            colReferenceable.set(AtlasClient.NAME, fs.getName());
+            colReferenceable.set(AtlasClient.OWNER, tableReference.get(AtlasClient.OWNER));
             colReferenceable.set("type", fs.getType());
             colReferenceable.set(HiveDataModelGenerator.COMMENT, fs.getComment());
+            colReferenceable.set(HiveDataModelGenerator.TABLE, tableReference.getId());
 
             colList.add(colReferenceable);
         }
         return colList;
     }
 
+    /**
+     * Register the Hive DataModel in Atlas, if not already defined.
+     *
+     * The method checks for the presence of the type {@link HiveDataTypes#HIVE_PROCESS} with the Atlas server.
+     * If this type is defined, then we assume the Hive DataModel is registered.
+     * @throws Exception
+     */
     public synchronized void registerHiveDataModel() throws Exception {
         HiveDataModelGenerator dataModelGenerator = new HiveDataModelGenerator();
         AtlasClient dgiClient = getAtlasClient();
 
         try {
+            dgiClient.getType(FSDataTypes.HDFS_PATH().toString());
+            LOG.info("HDFS data model is already registered!");
+        } catch(AtlasServiceException ase) {
+            if (ase.getStatus() == ClientResponse.Status.NOT_FOUND) {
+                //Trigger val definition
+                FSDataModel.main(null);
+
+                final String hdfsModelJson = TypesSerialization.toJson(FSDataModel.typesDef());
+                //Expected in case types do not exist
+                LOG.info("Registering HDFS data model : " + hdfsModelJson);
+                dgiClient.createType(hdfsModelJson);
+            }
+        }
+
+        try {
             dgiClient.getType(HiveDataTypes.HIVE_PROCESS.getName());
             LOG.info("Hive data model is already registered!");
         } catch(AtlasServiceException ase) {
-            //Expected in case types do not exist
-            LOG.info("Registering Hive data model");
-            dgiClient.createType(dataModelGenerator.getModelAsJson());
+            if (ase.getStatus() == ClientResponse.Status.NOT_FOUND) {
+                //Expected in case types do not exist
+                LOG.info("Registering Hive data model");
+                dgiClient.createType(dataModelGenerator.getModelAsJson());
+            }
         }
     }
 
-    public static void main(String[] argv) throws Exception {
-        Configuration atlasConf = ApplicationProperties.get(ApplicationProperties.CLIENT_PROPERTIES);
-        HiveMetaStoreBridge hiveMetaStoreBridge = new HiveMetaStoreBridge(new HiveConf(), atlasConf);
+    public static void main(String[] args) throws Exception {
+
+        Configuration atlasConf = ApplicationProperties.get();
+        String[] atlasEndpoint = atlasConf.getStringArray(ATLAS_ENDPOINT);
+        if (atlasEndpoint == null || atlasEndpoint.length == 0){
+            atlasEndpoint = new String[] { DEFAULT_DGI_URL };
+        }
+        AtlasClient atlasClient;
+
+        if (!AuthenticationUtil.isKerberosAuthenticationEnabled()) {
+            String[] basicAuthUsernamePassword = AuthenticationUtil.getBasicAuthenticationInput();
+            atlasClient = new AtlasClient(atlasEndpoint, basicAuthUsernamePassword);
+        } else {
+            UserGroupInformation ugi = UserGroupInformation.getCurrentUser();
+            atlasClient = new AtlasClient(ugi, ugi.getShortUserName(), atlasEndpoint);
+        }
+
+        Options options = new Options();
+        CommandLineParser parser = new BasicParser();
+        CommandLine cmd = parser.parse( options, args);
+
+        boolean failOnError = false;
+        if (cmd.hasOption("failOnError")) {
+            failOnError = true;
+        }
+
+        HiveMetaStoreBridge hiveMetaStoreBridge = new HiveMetaStoreBridge(atlasConf, new HiveConf(), atlasClient);
         hiveMetaStoreBridge.registerHiveDataModel();
-        hiveMetaStoreBridge.importHiveMetadata();
+        hiveMetaStoreBridge.importHiveMetadata(failOnError);
     }
 }

@@ -27,11 +27,13 @@ import com.tinkerpop.blueprints.Predicate;
 import com.tinkerpop.blueprints.Vertex;
 import org.apache.atlas.GraphTransaction;
 import org.apache.atlas.RepositoryMetadataModule;
+import org.apache.atlas.RequestContext;
 import org.apache.atlas.TestUtils;
 import org.apache.atlas.repository.Constants;
 import org.apache.atlas.typesystem.ITypedReferenceableInstance;
 import org.apache.atlas.typesystem.Referenceable;
 import org.apache.atlas.typesystem.Struct;
+import org.apache.atlas.typesystem.persistence.Id;
 import org.apache.atlas.typesystem.types.ClassType;
 import org.apache.atlas.typesystem.types.IDataType;
 import org.apache.atlas.typesystem.types.Multiplicity;
@@ -39,6 +41,7 @@ import org.apache.atlas.typesystem.types.TypeSystem;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
+import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Guice;
 import org.testng.annotations.Test;
 
@@ -75,6 +78,11 @@ public class GraphRepoMapperScaleTest {
         searchIndexer.onAdd(typesAdded);
     }
 
+    @BeforeMethod
+    public void setupContext() {
+        RequestContext.createContext();
+    }
+
     @AfterClass
     public void tearDown() throws Exception {
         TypeSystem.getInstance().reset();
@@ -101,7 +109,7 @@ public class GraphRepoMapperScaleTest {
         ClassType dbType = typeSystem.getDataType(ClassType.class, TestUtils.DATABASE_TYPE);
         ITypedReferenceableInstance db = dbType.convert(databaseInstance, Multiplicity.REQUIRED);
 
-        dbGUID = repositoryService.createEntities(db)[0];
+        dbGUID = repositoryService.createEntities(db).get(0);
 
         Referenceable dbInstance = new Referenceable(dbGUID, TestUtils.DATABASE_TYPE, databaseInstance.getValuesMap());
 
@@ -127,6 +135,8 @@ public class GraphRepoMapperScaleTest {
         for (int index = 500; index < 600; index++) {
             searchWithIndex("hive_table.name", "bar-" + index);
         }
+
+        searchWithIndex(Constants.STATE_PROPERTY_KEY, Id.EntityState.ACTIVE.name());
     }
 
     private void searchWithOutIndex(String key, String value) {
@@ -215,7 +225,7 @@ public class GraphRepoMapperScaleTest {
 
         ArrayList<Struct> partitions = new ArrayList<>();
         for (int index = 0; index < 5; index++) {
-            Struct partitionInstance = new Struct("partition_type");
+            Struct partitionInstance = new Struct(TestUtils.PARTITION_STRUCT_TYPE);
             partitionInstance.set("name", "partition_" + "-" + uberIndex + "-" + index);
             partitions.add(partitionInstance);
         }

@@ -33,7 +33,7 @@ import java.util.Map;
  */
 public class Referenceable extends Struct implements IReferenceableInstance {
 
-    private final Id id;
+    private Id id;
     private final ImmutableMap<String, IStruct> traits;
     private final ImmutableList<String> traitNames;
 
@@ -78,6 +78,21 @@ public class Referenceable extends Struct implements IReferenceableInstance {
     }
 
     /**
+     * Not public - only use during deserialization
+     * @param id      entity id
+     * @param typeName  the type name
+     * @param values    the entity attribute values
+     */
+    @InterfaceAudience.Private
+    public Referenceable(Id id, String typeName, Map<String, Object> values, List<String> _traitNames,
+                         Map<String, IStruct> _traits) {
+        super(typeName, values);
+        this.id = id;
+        traitNames = ImmutableList.copyOf(_traitNames);
+        traits = ImmutableMap.copyOf(_traits);
+    }
+
+    /**
      * Construct a Referenceable from the given IReferenceableInstance.
      *
      * @param instance  the referenceable instance to copy
@@ -85,7 +100,7 @@ public class Referenceable extends Struct implements IReferenceableInstance {
      * @throws AtlasException if the referenceable can not be created
      */
     public Referenceable(IReferenceableInstance instance) throws AtlasException {
-        this(instance.getId()._getId(), instance.getTypeName(), instance.getValuesMap(), instance.getTraits(),
+        this(instance.getId(), instance.getTypeName(), instance.getValuesMap(), instance.getTraits(),
             getTraits(instance));
     }
 
@@ -149,6 +164,15 @@ public class Referenceable extends Struct implements IReferenceableInstance {
             ", traits=" + traitNames +
             ", values=" + getValuesMap() +
             '}';
+    }
+
+    @Override
+    public String toShortString() {
+        return String.format("entity[type=%s guid=%s]", typeName, id._getId());
+    }
+
+    public void replaceWithNewId(Id id) {
+        this.id = id;
     }
 
     private static Map<String, IStruct> getTraits(IReferenceableInstance instance) throws AtlasException {

@@ -18,9 +18,11 @@
 
 package org.apache.atlas.web.security;
 
+import org.apache.atlas.ApplicationProperties;
 import org.apache.atlas.AtlasClient;
 import org.apache.atlas.AtlasException;
 import org.apache.atlas.web.TestUtils;
+import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.security.alias.JavaKeyStoreProvider;
@@ -58,41 +60,51 @@ public class NegativeSSLAndKerberosTest extends BaseSSLAndKerberosTest {
 
         // client will actually only leverage subset of these properties
         final PropertiesConfiguration configuration = getSSLConfiguration(providerUrl);
-        configuration.setProperty("atlas.http.authentication.type", "kerberos");
 
-        TestUtils.writeConfiguration(configuration, persistDir + File.separator + "client.properties");
+        persistSSLClientConfiguration((org.apache.commons.configuration.Configuration) configuration);
+
+        TestUtils.writeConfiguration(configuration, persistDir + File.separator +
+            ApplicationProperties.APPLICATION_PROPERTIES);
 
         String confLocation = System.getProperty("atlas.conf");
         URL url;
         if (confLocation == null) {
-            url = NegativeSSLAndKerberosTest.class.getResource("/application.properties");
+            url = NegativeSSLAndKerberosTest.class.getResource("/" + ApplicationProperties.APPLICATION_PROPERTIES);
         } else {
-            url = new File(confLocation, "application.properties").toURI().toURL();
+            url = new File(confLocation, ApplicationProperties.APPLICATION_PROPERTIES).toURI().toURL();
         }
         configuration.load(url);
 
         configuration.setProperty(TLS_ENABLED, true);
-        configuration.setProperty("atlas.http.authentication.enabled", "true");
-        configuration.setProperty("atlas.http.authentication.kerberos.principal", "HTTP/localhost@" + kdc.getRealm());
-        configuration.setProperty("atlas.http.authentication.kerberos.keytab", httpKeytabFile.getAbsolutePath());
-        configuration.setProperty("atlas.http.authentication.kerberos.name.rules",
+        configuration.setProperty("atlas.authentication.method.kerberos", "true");
+        configuration.setProperty("atlas.authentication.keytab",userKeytabFile.getAbsolutePath());
+        configuration.setProperty("atlas.authentication.principal","dgi/localhost@"+kdc.getRealm());
+
+        configuration.setProperty("atlas.authentication.method.file", "false");
+        configuration.setProperty("atlas.authentication.method.kerberos", "true");
+        configuration.setProperty("atlas.authentication.method.kerberos.principal", "HTTP/localhost@" + kdc.getRealm());
+        configuration.setProperty("atlas.authentication.method.kerberos.keytab", httpKeytabFile.getAbsolutePath());
+        configuration.setProperty("atlas.authentication.method.kerberos.name.rules",
                 "RULE:[1:$1@$0](.*@EXAMPLE.COM)s/@.*//\nDEFAULT");
 
-        TestUtils.writeConfiguration(configuration, persistDir + File.separator + "application.properties");
-
-        dgiClient = new AtlasClient(DGI_URL) {
-            @Override
-            protected PropertiesConfiguration getClientProperties() throws AtlasException {
-                return configuration;
-            }
-        };
+        TestUtils.writeConfiguration(configuration, persistDir + File.separator +
+                ApplicationProperties.APPLICATION_PROPERTIES);
 
         // save original setting
         originalConf = System.getProperty("atlas.conf");
         System.setProperty("atlas.conf", persistDir);
+
+        dgiClient = new AtlasClient(DGI_URL) {
+            @Override
+            protected PropertiesConfiguration getClientProperties() {
+                return configuration;
+            }
+        };
+
+
         secureEmbeddedServer = new TestSecureEmbeddedServer(21443, getWarPath()) {
             @Override
-            public PropertiesConfiguration getConfiguration() {
+            public Configuration getConfiguration() {
                 return configuration;
             }
         };

@@ -19,8 +19,10 @@
 package org.apache.atlas.typesystem.types;
 
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
+
 import org.apache.atlas.AtlasException;
 import org.apache.atlas.typesystem.IReferenceableInstance;
 import org.apache.atlas.typesystem.ITypedReferenceableInstance;
@@ -143,7 +145,7 @@ public class EnumTest extends BaseTest {
 
     protected ClassType defineClassTypeWithEnum(TypeSystem ts) throws AtlasException {
         return ts.defineClassType(
-                createClassTypeDef("t4", ImmutableList.<String>of(), createRequiredAttrDef("a", DataTypes.INT_TYPE),
+                createClassTypeDef("t4", ImmutableSet.<String>of(), createRequiredAttrDef("a", DataTypes.INT_TYPE),
                         createOptionalAttrDef("b", DataTypes.BOOLEAN_TYPE),
                         createOptionalAttrDef("c", DataTypes.BYTE_TYPE),
                         createOptionalAttrDef("d", DataTypes.SHORT_TYPE),
@@ -167,7 +169,7 @@ public class EnumTest extends BaseTest {
     public void testStruct() throws AtlasException {
         TypeSystem ts = getTypeSystem();
         defineEnums(ts);
-        StructType structType = ts.defineStructType("t3", true, createRequiredAttrDef("a", DataTypes.INT_TYPE),
+        StructType structType = ts.defineStructType("ts", true, createRequiredAttrDef("a", DataTypes.INT_TYPE),
                 createOptionalAttrDef("b", DataTypes.BOOLEAN_TYPE), createOptionalAttrDef("c", DataTypes.BYTE_TYPE),
                 createOptionalAttrDef("d", DataTypes.SHORT_TYPE),
                 createOptionalAttrDef("enum1", ts.getDataType(EnumType.class, "HiveObjectType")),
@@ -184,7 +186,7 @@ public class EnumTest extends BaseTest {
                 createOptionalAttrDef("o", ts.defineMapType(DataTypes.STRING_TYPE, DataTypes.DOUBLE_TYPE)),
                 createOptionalAttrDef("enum4", ts.getDataType(EnumType.class, "LockLevel")));
 
-        Struct s = createStructWithEnum("t3");
+        Struct s = createStructWithEnum("ts");
         ITypedStruct typedS = structType.convert(s, Multiplicity.REQUIRED);
         Assert.assertEquals(typedS.toString(), "{\n" +
                 "\ta : \t1\n" +

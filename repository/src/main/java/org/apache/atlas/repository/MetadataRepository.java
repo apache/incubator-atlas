@@ -18,11 +18,13 @@
 
 package org.apache.atlas.repository;
 
+import org.apache.atlas.AtlasClient;
 import org.apache.atlas.AtlasException;
-import org.apache.atlas.typesystem.exception.EntityExistsException;
-import org.apache.atlas.typesystem.exception.EntityNotFoundException;
 import org.apache.atlas.typesystem.ITypedReferenceableInstance;
 import org.apache.atlas.typesystem.ITypedStruct;
+import org.apache.atlas.typesystem.exception.EntityExistsException;
+import org.apache.atlas.typesystem.exception.EntityNotFoundException;
+import org.apache.atlas.typesystem.exception.TraitNotFoundException;
 import org.apache.atlas.typesystem.types.AttributeInfo;
 import org.apache.atlas.typesystem.types.IDataType;
 
@@ -46,6 +48,12 @@ public interface MetadataRepository {
      * @return property key used to store super type names.
      */
     String getSuperTypeAttributeName();
+
+    /**
+     * Returns the attribute name used for entity state
+     * @return
+     */
+    String getStateAttributeName();
 
     /**
      * Return the property key used to store a given traitName in the repository.
@@ -82,7 +90,7 @@ public interface MetadataRepository {
      * @throws RepositoryException
      * @throws EntityExistsException
      */
-    String[] createEntities(ITypedReferenceableInstance... entities) throws RepositoryException, EntityExistsException;
+    List<String> createEntities(ITypedReferenceableInstance... entities) throws RepositoryException, EntityExistsException;
 
     /**
      * Fetch the complete definition of an entity given its GUID.
@@ -103,13 +111,15 @@ public interface MetadataRepository {
     List<String> getEntityList(String entityType) throws RepositoryException;
 
     /**
-     * Deletes an entity definition (instance) corresponding to a given type.
+     * Deletes entities for the specified guids.
      *
-     * @param guid globally unique identifier for the entity
-     * @return true if deleted else false
+     * @param guids globally unique identifiers for the deletion candidate entities
+     * @return guids of deleted entities
      * @throws RepositoryException
      */
-    // boolean deleteEntity(String guid) throws RepositoryException;
+    AtlasClient.EntityResult deleteEntities(List<String> guids) throws RepositoryException;
+    
+    
     // Trait management functions
 
     /**
@@ -137,19 +147,19 @@ public interface MetadataRepository {
      * @param traitNameToBeDeleted name of the trait
      * @throws RepositoryException
      */
-    void deleteTrait(String guid, String traitNameToBeDeleted) throws EntityNotFoundException, RepositoryException;
+    void deleteTrait(String guid, String traitNameToBeDeleted) throws TraitNotFoundException, EntityNotFoundException, RepositoryException;
 
     /**
      * Adds/Updates the property to the entity that corresponds to the GUID
      * Supports only primitive attribute/Class Id updations.
      */
-    void updatePartial(ITypedReferenceableInstance entity) throws RepositoryException;
+    AtlasClient.EntityResult updatePartial(ITypedReferenceableInstance entity) throws RepositoryException;
 
     /**
      * Adds the property to the entity that corresponds to the GUID
      * @param entitiesToBeUpdated The entities to be updated
      */
-    String[] updateEntities(ITypedReferenceableInstance... entitiesToBeUpdated) throws RepositoryException;
+    AtlasClient.EntityResult updateEntities(ITypedReferenceableInstance... entitiesToBeUpdated) throws RepositoryException;
 
     /**
      * Returns the entity for the given type and qualified name

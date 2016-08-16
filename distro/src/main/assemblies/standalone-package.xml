@@ -28,7 +28,7 @@
     <baseDirectory>apache-atlas-${project.version}</baseDirectory>
     <fileSets>
         <fileSet>
-            <directory>src/conf/</directory>
+            <directory>target/conf/</directory>
             <outputDirectory>conf</outputDirectory>
         </fileSet>
 
@@ -55,6 +55,32 @@
         </fileSet>
 
         <fileSet>
+            <directory>target/bin</directory>
+            <outputDirectory>hook-bin</outputDirectory>
+            <includes>
+                <include>atlas_client_cmdline.py</include>
+                <include>atlas_config.py</include>
+                <include>atlas_kafka_setup_hook.py</include>
+            </includes>
+            <fileMode>0755</fileMode>
+            <directoryMode>0755</directoryMode>
+        </fileSet>
+
+        <fileSet>
+            <directory>target/hbase</directory>
+            <outputDirectory>hbase</outputDirectory>
+            <fileMode>0755</fileMode>
+            <directoryMode>0755</directoryMode>
+        </fileSet>
+
+        <fileSet>
+            <directory>target/solr</directory>
+            <outputDirectory>solr</outputDirectory>
+            <fileMode>0755</fileMode>
+            <directoryMode>0755</directoryMode>
+        </fileSet>
+
+        <fileSet>
             <directory>../logs</directory>
             <outputDirectory>logs</outputDirectory>
             <directoryMode>0777</directoryMode>
@@ -69,8 +95,8 @@
             <outputDirectory>/</outputDirectory>
             <includes>
                 <include>DISCLAIMER.txt</include>
-                <include>NOTICE.txt</include>
-                <include>LICENSE.txt</include>
+                <include>NOTICE</include>
+                <include>LICENSE</include>
                 <include>CHANGES.txt</include>
                 <include>README</include>
             </includes>
@@ -79,6 +105,12 @@
         <fileSet>
             <directory>../src/main/examples</directory>
             <outputDirectory>examples</outputDirectory>
+        </fileSet>
+
+        <!-- addons/hdfs-model -->
+        <fileSet>
+            <directory>../addons/hdfs-model/target/models</directory>
+            <outputDirectory>models</outputDirectory>
         </fileSet>
 
         <!-- addons/hive -->
@@ -96,6 +128,50 @@
 
         <fileSet>
             <directory>../addons/hive-bridge/target/dependency/hook</directory>
+            <outputDirectory>hook</outputDirectory>
+        </fileSet>
+
+        <fileSet>
+            <directory>../addons/hive-bridge/target/models</directory>
+            <outputDirectory>models</outputDirectory>
+        </fileSet>
+
+        <!-- addons/falcon -->
+        <fileSet>
+            <directory>../addons/falcon-bridge/target/dependency/hook</directory>
+            <outputDirectory>hook</outputDirectory>
+        </fileSet>
+
+        <fileSet>
+            <directory>../addons/falcon-bridge/target/models</directory>
+            <outputDirectory>models</outputDirectory>
+        </fileSet>
+
+        <!-- addons/sqoop -->
+        <fileSet>
+            <directory>../addons/sqoop-bridge/target/dependency/hook</directory>
+            <outputDirectory>hook</outputDirectory>
+        </fileSet>
+
+        <fileSet>
+            <directory>../addons/sqoop-bridge/target/models</directory>
+            <outputDirectory>models</outputDirectory>
+        </fileSet>
+
+        <!-- addons/storm -->
+        <fileSet>
+            <directory>../addons/storm-bridge/target/dependency/hook</directory>
+            <outputDirectory>hook</outputDirectory>
+        </fileSet>
+
+        <fileSet>
+            <directory>../addons/storm-bridge/target/models</directory>
+            <outputDirectory>models</outputDirectory>
+        </fileSet>
+
+        <!-- for kafka topic setup -->
+        <fileSet>
+            <directory>../notification/target/dependency/hook</directory>
             <outputDirectory>hook</outputDirectory>
         </fileSet>
     </fileSets>

@@ -24,6 +24,7 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.security.alias.CredentialProvider;
 import org.apache.hadoop.security.alias.CredentialProviderFactory;
 import org.eclipse.jetty.server.Server;
+import org.eclipse.jetty.webapp.WebAppContext;
 
 import java.io.File;
 import java.io.IOException;
@@ -32,13 +33,14 @@ import java.io.IOException;
  *
  */
 public class BaseSSLAndKerberosTest extends BaseSecurityTest {
+    public static final String TEST_USER_JAAS_SECTION = "TestUser";
     public static final String TESTUSER = "testuser";
     public static final String TESTPASS = "testpass";
     protected static final String DGI_URL = "https://localhost:21443/";
     protected Path jksPath;
     protected String providerUrl;
     protected File httpKeytabFile;
-    private File userKeytabFile;
+    protected File userKeytabFile;
 
     class TestSecureEmbeddedServer extends SecureEmbeddedServer {
 
@@ -51,8 +53,11 @@ public class BaseSSLAndKerberosTest extends BaseSecurityTest {
         }
 
         @Override
-        public org.apache.commons.configuration.Configuration getConfiguration() {
-            return super.getConfiguration();
+        protected WebAppContext getWebAppContext(String path) {
+            WebAppContext application = new WebAppContext(path, "/");
+            application.setDescriptor(System.getProperty("projectBaseDir") + "/webapp/src/test/webapp/WEB-INF/web.xml");
+            application.setClassLoader(Thread.currentThread().getContextClassLoader());
+            return application;
         }
     }
 
@@ -93,14 +98,14 @@ public class BaseSSLAndKerberosTest extends BaseSecurityTest {
         File kdcWorkDir = startKDC();
 
         userKeytabFile = createKeytab(kdc, kdcWorkDir, "dgi", "dgi.keytab");
-        createKeytab(kdc, kdcWorkDir, "zookeeper", "dgi.keytab");
+        //createKeytab(kdc, kdcWorkDir, "zookeeper", "dgi.keytab");
         httpKeytabFile = createKeytab(kdc, kdcWorkDir, "HTTP", "spnego.service.keytab");
 
         // create a test user principal
         kdc.createPrincipal(TESTUSER, TESTPASS);
 
         StringBuilder jaas = new StringBuilder(1024);
-        jaas.append("TestUser {\n" +
+        jaas.append(TEST_USER_JAAS_SECTION + " {\n" +
                 "    com.sun.security.auth.module.Krb5LoginModule required\nuseTicketCache=true;\n" +
                 "};\n");
         jaas.append(createJAASEntry("Client", "dgi", userKeytabFile));

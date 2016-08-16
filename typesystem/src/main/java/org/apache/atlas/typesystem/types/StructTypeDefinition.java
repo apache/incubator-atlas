@@ -25,18 +25,27 @@ import java.util.Arrays;
 public class StructTypeDefinition {
 
     public final String typeName;
+    public final String typeDescription;//optional field
     public final AttributeDefinition[] attributeDefinitions;
 
-    protected StructTypeDefinition(String typeName, boolean validate, AttributeDefinition... attributeDefinitions) {
+    protected StructTypeDefinition(String typeName, String typeDescription, boolean validate,
+                                   AttributeDefinition... attributeDefinitions) {
         this.typeName = ParamChecker.notEmpty(typeName, "Struct type name");
-        if (attributeDefinitions != null && attributeDefinitions.length != 0) {
+        this.typeDescription = typeDescription;
+        if (validate) {
             ParamChecker.notNullElements(attributeDefinitions, "Attribute definitions");
         }
         this.attributeDefinitions = attributeDefinitions;
     }
 
     public StructTypeDefinition(String typeName, AttributeDefinition[] attributeDefinitions) {
+        this(typeName, null, attributeDefinitions);
+    }
+
+    public StructTypeDefinition(String typeName, String typeDescription,
+        AttributeDefinition[] attributeDefinitions) {
         this.typeName = ParamChecker.notEmpty(typeName, "Struct type name");
+        this.typeDescription = typeDescription;
         this.attributeDefinitions = ParamChecker.notNullElements(attributeDefinitions, "Attribute definitions");
     }
 
@@ -57,7 +66,6 @@ public class StructTypeDefinition {
         if (!typeName.equals(that.typeName)) {
             return false;
         }
-
         return true;
     }
 

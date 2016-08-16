@@ -17,9 +17,12 @@
 
 package org.apache.atlas;
 
+import org.apache.atlas.typesystem.types.TypeSystem;
 import org.apache.commons.configuration.Configuration;
 import org.testng.Assert;
 import org.testng.annotations.Test;
+
+import static org.testng.Assert.assertEquals;
 
 public class ApplicationPropertiesTest {
 
@@ -28,17 +31,17 @@ public class ApplicationPropertiesTest {
         Configuration properties = ApplicationProperties.get(ApplicationProperties.APPLICATION_PROPERTIES);
 
         //plain property without variables
-        Assert.assertEquals(properties.getString("atlas.service"), "atlas");
+        assertEquals(properties.getString("atlas.service"), "atlas");
 
         //property containing system property
-        String data = "/var/data/" + System.getProperty("user.name") + "/atlas";
-        Assert.assertEquals(properties.getString("atlas.data"), data);
+        String data = System.getProperty("user.dir") + "/target/data";
+        assertEquals(properties.getString("atlas.data"), data);
 
         //property referencing other property
-        Assert.assertEquals(properties.getString("atlas.graph.data"), data + "/graph");
+        assertEquals(properties.getString("atlas.graph.data"), data + "/graph");
 
         //invalid system property - not substituted
-        Assert.assertEquals(properties.getString("atlas.db"), "${atlasdb}");
+        assertEquals(properties.getString("atlas.db"), "${atlasdb}");
     }
 
     @Test
@@ -47,9 +50,34 @@ public class ApplicationPropertiesTest {
         Configuration configuration = ApplicationProperties.get(ApplicationProperties.APPLICATION_PROPERTIES);
         Configuration subConfiguration = configuration.subset("atlas");
 
-        Assert.assertEquals(subConfiguration.getString("service"), "atlas");
-        String data = "/var/data/" + System.getProperty("user.name") + "/atlas";
-        Assert.assertEquals(subConfiguration.getString("data"), data);
-        Assert.assertEquals(subConfiguration.getString("graph.data"), data + "/graph");
+        assertEquals(subConfiguration.getString("service"), "atlas");
+        String data = System.getProperty("user.dir") + "/target/data";
+        assertEquals(subConfiguration.getString("data"), data);
+        assertEquals(subConfiguration.getString("graph.data"), data + "/graph");
+    }
+
+    @Test
+    public void testGetClass() throws Exception {
+        Configuration configuration = ApplicationProperties.get();
+
+        //read from atlas-application.properties
+        Class cls = ApplicationProperties.getClass(configuration, "atlas.TypeSystem.impl",
+            ApplicationProperties.class.getName(), TypeSystem.class);
+        assertEquals(cls.getName(), TypeSystem.class.getName());
+
+        //default value
+        cls = ApplicationProperties.getClass(configuration, "atlas.TypeSystem2.impl",
+            TypeSystem.class.getName(), TypeSystem.class);
+        assertEquals(cls.getName(), TypeSystem.class.getName());
+
+        //incompatible assignTo class, should throw AtlasException
+        try {
+            cls = ApplicationProperties.getClass(configuration, "atlas.TypeSystem.impl",
+                ApplicationProperties.class.getName(), ApplicationProperties.class);
+            Assert.fail(AtlasException.class.getSimpleName() + " was expected but none thrown.");
+        }
+        catch (AtlasException e) {
+            // good
+        }
     }
 }

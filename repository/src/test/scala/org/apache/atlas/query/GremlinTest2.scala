@@ -37,7 +37,7 @@ class GremlinTest2 extends BaseGremlinTest {
     TypeSystem.getInstance().reset()
     QueryTestsUtils.setupTypes
     gProvider = new TitanGraphProvider();
-    gp = new DefaultGraphPersistenceStrategy(new GraphBackedMetadataRepository(gProvider))
+    gp = new DefaultGraphPersistenceStrategy(new GraphBackedMetadataRepository(gProvider, null))
     g = QueryTestsUtils.setupTestGraph(gProvider)
   }
 
@@ -89,7 +89,7 @@ class GremlinTest2 extends BaseGremlinTest {
   }
 
   @Test def testLineageAllSelectWithPathFromParser {
-    val p = new QueryParser
+    val p = QueryParser
     val e = p("Table as src loop (LoadProcess outputTable) as dest " +
       "select src.name as srcTable, dest.name as destTable withPath").right.get
     //Table as src loop (LoadProcess where LoadProcess.outputTable) as dest select src.name as srcTable, dest.name as destTable withPath
@@ -98,7 +98,7 @@ class GremlinTest2 extends BaseGremlinTest {
   }
 
   @Test def testLineageAllSelectWithPathFromParser2 {
-    val p = new QueryParser
+    val p = QueryParser
 
     val e = p("Table as src loop (`LoadProcess->outputTable` inputTables) as dest " +
       "select src.name as srcTable, dest.name as destTable withPath").right.get
@@ -107,7 +107,7 @@ class GremlinTest2 extends BaseGremlinTest {
   }
 
   @Test def testHighLevelLineage {
-        val r = HiveLineageQuery("Table", "sales_fact_monthly_mv",
+        val r = InputLineageClosureQuery("Table", "name", "sales_fact_monthly_mv",
           "LoadProcess",
           "inputTables",
           "outputTable",
@@ -116,7 +116,7 @@ class GremlinTest2 extends BaseGremlinTest {
   }
 
   @Test def testHighLevelLineageReturnGraph {
-    val r = HiveLineageQuery("Table", "sales_fact_monthly_mv",
+    val r = InputLineageClosureQuery("Table", "name", "sales_fact_monthly_mv",
       "LoadProcess",
       "inputTables",
       "outputTable",
@@ -127,7 +127,7 @@ class GremlinTest2 extends BaseGremlinTest {
   }
 
   @Test def testHighLevelWhereUsed {
-    val r = HiveWhereUsedQuery("Table", "sales_fact",
+    val r = OutputLineageClosureQuery("Table", "name", "sales_fact",
       "LoadProcess",
       "inputTables",
       "outputTable",
@@ -136,7 +136,7 @@ class GremlinTest2 extends BaseGremlinTest {
   }
 
   @Test def testHighLevelWhereUsedReturnGraph {
-    val r = HiveWhereUsedQuery("Table", "sales_fact",
+    val r = OutputLineageClosureQuery("Table", "name", "sales_fact",
       "LoadProcess",
       "inputTables",
       "outputTable",

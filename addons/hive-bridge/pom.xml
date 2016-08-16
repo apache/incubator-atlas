@@ -17,14 +17,12 @@
   ~ limitations under the License.
   -->
 
-<project xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xmlns="http://maven.apache.org/POM/4.0.0"
-         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
     <parent>
         <artifactId>apache-atlas</artifactId>
         <groupId>org.apache.atlas</groupId>
-        <version>0.6-incubating-SNAPSHOT</version>
+        <version>0.8-incubating-SNAPSHOT</version>
         <relativePath>../../</relativePath>
     </parent>
     <artifactId>hive-bridge</artifactId>
@@ -72,6 +70,13 @@
 
         <dependency>
             <groupId>org.apache.hive</groupId>
+            <artifactId>hive-jdbc</artifactId>
+            <version>${hive.version}</version>
+            <scope>test</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>org.apache.hive</groupId>
             <artifactId>hive-cli</artifactId>
             <version>${hive.version}</version>
             <scope>test</scope>
@@ -103,6 +108,11 @@
             <artifactId>atlas-notification</artifactId>
         </dependency>
 
+        <dependency>
+            <groupId>org.apache.atlas</groupId>
+            <artifactId>hdfs-model</artifactId>
+        </dependency>
+
         <!-- to bring up atlas server for integration tests -->
         <dependency>
             <groupId>org.apache.atlas</groupId>
@@ -127,8 +137,20 @@
         </dependency>
 
         <dependency>
+            <groupId>org.mockito</groupId>
+            <artifactId>mockito-all</artifactId>
+        </dependency>
+
+        <dependency>
             <groupId>org.eclipse.jetty</groupId>
             <artifactId>jetty-server</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>org.apache.atlas</groupId>
+            <artifactId>atlas-typesystem</artifactId>
+            <classifier>tests</classifier>
             <scope>test</scope>
         </dependency>
     </dependencies>
@@ -140,45 +162,13 @@
                 <artifactId>maven-dependency-plugin</artifactId>
                 <executions>
                     <execution>
-                        <id>copy-bridge-dependencies</id>
-                        <phase>package</phase>
-                        <goals>
-                            <goal>copy-dependencies</goal>
-                        </goals>
-                        <configuration>
-                            <outputDirectory>${project.build.directory}/dependency/bridge/hive</outputDirectory>
-                            <includeScope>compile</includeScope>
-                            <overWriteReleases>false</overWriteReleases>
-                            <overWriteSnapshots>false</overWriteSnapshots>
-                            <overWriteIfNewer>true</overWriteIfNewer>
-                        </configuration>
-                    </execution>
-                    <execution>
                         <id>copy-hook</id>
                         <phase>package</phase>
                         <goals>
                             <goal>copy</goal>
                         </goals>
                         <configuration>
-                            <artifactItems>
-                                <artifactItem>
-                                    <groupId>${project.groupId}</groupId>
-                                    <artifactId>${project.artifactId}</artifactId>
-                                    <version>${project.version}</version>
-                                    <overWrite>true</overWrite>
-                                    <outputDirectory>${project.build.directory}/dependency/hook/hive</outputDirectory>
-                                </artifactItem>
-                            </artifactItems>
-                        </configuration>
-                    </execution>
-                    <execution>
-                        <id>copy-hook-dependencies</id>
-                        <phase>package</phase>
-                        <goals>
-                            <goal>copy</goal>
-                        </goals>
-                        <configuration>
-                            <outputDirectory>${project.build.directory}/dependency/hook/hive</outputDirectory>
+                            <outputDirectory>${project.build.directory}/dependency/hook/hive/atlas-hive-plugin-impl</outputDirectory>
                             <overWriteReleases>false</overWriteReleases>
                             <overWriteSnapshots>false</overWriteSnapshots>
                             <overWriteIfNewer>true</overWriteIfNewer>
@@ -216,6 +206,11 @@
                                 <artifactItem>
                                     <groupId>${project.groupId}</groupId>
                                     <artifactId>atlas-notification</artifactId>
+                                    <version>${project.version}</version>
+                                </artifactItem>
+                                <artifactItem>
+                                    <groupId>${project.groupId}</groupId>
+                                    <artifactId>hdfs-model</artifactId>
                                     <version>${project.version}</version>
                                 </artifactItem>
                                 <artifactItem>
@@ -258,6 +253,36 @@
                                     <artifactId>kafka-clients</artifactId>
                                     <version>${kafka.version}</version>
                                 </artifactItem>
+                                <artifactItem>
+                                    <groupId>com.google.code.gson</groupId>
+                                    <artifactId>gson</artifactId>
+                                    <version>${gson.version}</version>
+                                </artifactItem>
+                            </artifactItems>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>copy-hook-shim</id>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>copy</goal>
+                        </goals>
+                        <configuration>
+                            <outputDirectory>${project.build.directory}/dependency/hook/hive</outputDirectory>
+                            <overWriteReleases>false</overWriteReleases>
+                            <overWriteSnapshots>false</overWriteSnapshots>
+                            <overWriteIfNewer>true</overWriteIfNewer>
+                            <artifactItems>
+                                <artifactItem>
+                                    <groupId>${project.groupId}</groupId>
+                                    <artifactId>hive-bridge-shim</artifactId>
+                                    <version>${project.version}</version>
+                                </artifactItem>
+                                <artifactItem>
+                                    <groupId>${project.groupId}</groupId>
+                                    <artifactId>atlas-plugin-classloader</artifactId>
+                                    <version>${project.version}</version>
+                                </artifactItem>
                             </artifactItems>
                         </configuration>
                     </execution>
@@ -278,21 +303,35 @@
                     <daemon>true</daemon>
                     <webApp>
                         <contextPath>/</contextPath>
-                        <descriptor>../../webapp/src/test/webapp/WEB-INF/web.xml</descriptor>
+                        <descriptor>${project.basedir}/../../webapp/src/test/webapp/WEB-INF/web.xml</descriptor>
+                        <extraClasspath>${project.basedir}/../../webapp/target/test-classes/</extraClasspath>
                     </webApp>
                     <useTestScope>true</useTestScope>
                     <systemProperties>
                         <systemProperty>
                             <name>log4j.configuration</name>
-                            <value>atlas-log4j.xml</value>
+                            <value>file://${project.basedir}/../../distro/src/conf/atlas-log4j.xml</value>
+                        </systemProperty>
+                        <systemProperty>
+                            <name>atlas.log.file</name>
+                            <value>application.log</value>
                         </systemProperty>
                         <systemProperty>
                             <name>atlas.log.dir</name>
                             <value>${project.build.directory}/logs</value>
                         </systemProperty>
+                        <systemProperty>
+                            <name>atlas.data</name>
+                            <value>${project.build.directory}/data</value>
+                        </systemProperty>
+                        <systemProperty>
+                            <key>atlas.conf</key>
+                            <value>${project.build.directory}/../../../typesystem/target/test-classes</value>
+                        </systemProperty>
                     </systemProperties>
                     <stopKey>atlas-stop</stopKey>
                     <stopPort>31001</stopPort>
+                    <stopWait>${jetty-maven-plugin.stopWait}</stopWait>
                 </configuration>
                 <executions>
                     <execution>
@@ -337,6 +376,33 @@
                     <generateProjectInfo>false</generateProjectInfo>
                     <generateReports>false</generateReports>
                 </configuration>
+            </plugin>
+
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>exec-maven-plugin</artifactId>
+                <version>1.2.1</version>
+                <inherited>false</inherited>
+                <executions>
+                    <execution>
+                        <configuration>
+                            <mainClass>org.apache.atlas.hive.model.HiveDataModelGenerator</mainClass>
+                            <systemProperties>
+                                <systemProperty>
+                                    <key>atlas.conf</key>
+                                    <value>${project.build.directory}/../../../typesystem/target/test-classes</value>
+                                </systemProperty>
+                            </systemProperties>
+                            <arguments>
+                                <argument>${project.build.directory}/models/hive_model.json</argument>
+                            </arguments>
+                        </configuration>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>java</goal>
+                        </goals>
+                    </execution>
+                </executions>
             </plugin>
         </plugins>
     </build>

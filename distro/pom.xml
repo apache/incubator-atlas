@@ -22,12 +22,38 @@
     <parent>
         <artifactId>apache-atlas</artifactId>
         <groupId>org.apache.atlas</groupId>
-        <version>0.6-incubating-SNAPSHOT</version>
+        <version>0.8-incubating-SNAPSHOT</version>
         <relativePath>../pom.xml</relativePath>
     </parent>
     <artifactId>atlas-distro</artifactId>
     <description>Apache Atlas Distribution</description>
     <name>Apache Atlas Distribution</name>
+
+    <!-- by default configure hbase and solr with the distribution -->
+    <properties>
+
+        <titan.storage.backend>hbase</titan.storage.backend>
+        <titan.storage.properties>#Hbase
+#For standalone mode , specify localhost
+#for distributed mode, specify zookeeper quorum here - For more information refer http://s3.thinkaurelius.com/docs/titan/current/hbase.html#_remote_server_mode_2
+atlas.graph.storage.hostname=
+atlas.graph.storage.hbase.regions-per-server=1
+atlas.graph.storage.lock.wait-time=10000
+        </titan.storage.properties>
+        <titan.index.backend>solr5</titan.index.backend>
+        <titan.index.properties>#Solr
+#Solr cloud mode properties
+atlas.graph.index.search.solr.mode=cloud
+atlas.graph.index.search.solr.zookeeper-url=
+
+#Solr http mode properties
+#atlas.graph.index.search.solr.mode=http
+#atlas.graph.index.search.solr.http-urls=http://localhost:8983/solr
+        </titan.index.properties>
+        <hbase.embedded>false</hbase.embedded>
+        <solr.embedded>false</solr.embedded>
+	<entity.repository.properties>atlas.EntityAuditRepository.impl=org.apache.atlas.repository.audit.HBaseBasedAuditRepository</entity.repository.properties>
+    </properties>
 
     <profiles>
         <profile>
@@ -74,11 +100,132 @@
                                 </goals>
                                 <phase>package</phase>
                                 <configuration>
+                                    <skipAssembly>false</skipAssembly>
                                     <descriptors>
                                         <descriptor>src/main/assemblies/standalone-package.xml</descriptor>
                                         <descriptor>src/main/assemblies/src-package.xml</descriptor>
                                     </descriptors>
                                     <finalName>apache-atlas-${project.version}</finalName>
+                                    <tarLongFileMode>gnu</tarLongFileMode>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+        <!-- profile to configure berkeley and elasticsearch with the distribution -->
+        <profile>
+            <id>berkeley-elasticsearch</id>
+            <activation>
+                <activeByDefault>false</activeByDefault>
+            </activation>
+            <properties>
+                <titan.storage.backend>berkeleyje</titan.storage.backend>
+                <titan.storage.properties>#Berkeley
+atlas.graph.storage.directory=${sys:atlas.home}/data/berkley
+                </titan.storage.properties>
+                <titan.index.backend>elasticsearch</titan.index.backend>
+                <titan.index.properties>#ElasticSearch
+atlas.graph.index.search.directory=${sys:atlas.home}/data/es
+atlas.graph.index.search.elasticsearch.client-only=false
+atlas.graph.index.search.elasticsearch.local-mode=true
+atlas.graph.index.search.elasticsearch.create.sleep=2000
+                </titan.index.properties>
+		<entity.repository.properties>atlas.EntityAuditRepository.impl=org.apache.atlas.repository.audit.NoopEntityAuditRepository</entity.repository.properties>
+            </properties>
+        </profile>
+
+        <!-- profile to configure berkeley and elasticsearch with the distribution -->
+        <profile>
+            <id>external-hbase-solr</id>
+            <activation>
+                <activeByDefault>true</activeByDefault>
+            </activation>
+        </profile>
+
+        <!-- profile to package and configure embedded hbase and solr with the distribution -->
+        <profile>
+            <id>embedded-hbase-solr</id>
+            <activation>
+                <activeByDefault>false</activeByDefault>
+            </activation>
+            <properties>
+                <titan.storage.properties>#Hbase
+#For standalone mode , specify localhost
+#for distributed mode, specify zookeeper quorum here - For more information refer http://s3.thinkaurelius.com/docs/titan/current/hbase.html#_remote_server_mode_2
+atlas.graph.storage.hostname=localhost
+atlas.graph.storage.hbase.regions-per-server=1
+atlas.graph.storage.lock.wait-time=10000
+                </titan.storage.properties>
+                <titan.index.properties>#Solr
+#Solr cloud mode properties
+atlas.graph.index.search.solr.mode=cloud
+atlas.graph.index.search.solr.zookeeper-url=localhost:2181
+
+#Solr http mode properties
+#atlas.graph.index.search.solr.mode=http
+#atlas.graph.index.search.solr.http-urls=http://localhost:8983/solr
+                </titan.index.properties>
+
+                <hbase.embedded>true</hbase.embedded>
+                <solr.embedded>true</solr.embedded>
+
+                <hbase.dir>${project.build.directory}/hbase</hbase.dir>
+                <hbase.tar>http://archive.apache.org/dist/hbase/${hbase.version}/hbase-${hbase.version}-bin.tar.gz</hbase.tar>
+                <hbase.folder>hbase-${hbase.version}</hbase.folder>
+
+                <solr.dir>${project.build.directory}/solr</solr.dir>
+                <solr.tar>http://archive.apache.org/dist/lucene/solr/${solr.version}/solr-${solr.version}.tgz</solr.tar>
+                <solr.folder>solr-${solr.version}</solr.folder>
+            </properties>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-antrun-plugin</artifactId>
+                        <version>1.7</version>
+                        <executions>
+                            <!-- package hbase -->
+                            <execution>
+                                <id>hbase</id>
+                                <phase>generate-resources</phase>
+                                <goals>
+                                    <goal>run</goal>
+                                </goals>
+                                <configuration>
+                                    <target name="Download HBase">
+                                        <mkdir dir="${hbase.dir}" />
+                                        <mkdir dir="${project.basedir}/hbase" />
+                                        <get src="${hbase.tar}" dest="${project.basedir}/hbase/${hbase.folder}.tar.gz" usetimestamp="true" verbose="true" skipexisting="true" />
+                                        <untar src="${project.basedir}/hbase/${hbase.folder}.tar.gz" dest="${project.build.directory}/hbase.temp" compression="gzip" />
+                                        <copy todir="${hbase.dir}">
+                                            <fileset dir="${project.build.directory}/hbase.temp/${hbase.folder}">
+                                                <include name="**/*" />
+                                            </fileset>
+                                        </copy>
+                                    </target>
+                                </configuration>
+                            </execution>
+                            <!-- package solr -->
+                            <execution>
+                                <id>solr</id>
+                                <phase>generate-resources</phase>
+                                <goals>
+                                    <goal>run</goal>
+                                </goals>
+                                <configuration>
+                                    <target name="Download SOLR">
+                                        <mkdir dir="${solr.dir}" />
+                                        <mkdir dir="${project.basedir}/solr" />
+                                        <get src="${solr.tar}" dest="${project.basedir}/solr/${solr.folder}.tgz" usetimestamp="true" verbose="true" skipexisting="true" />
+                                        <untar src="${project.basedir}/solr/${solr.folder}.tgz" dest="${project.build.directory}/solr.temp" compression="gzip" />
+                                        <copy todir="${solr.dir}">
+                                            <fileset dir="${project.build.directory}/solr.temp/${solr.folder}">
+                                                <include name="**/*" />
+                                            </fileset>
+                                        </copy>
+                                    </target>
                                 </configuration>
                             </execution>
                         </executions>
@@ -89,14 +236,20 @@
     </profiles>
 
     <build>
-        <outputDirectory>target/bin</outputDirectory>
+        <outputDirectory>target</outputDirectory>
         <resources>
             <resource>
                 <directory>src/bin</directory>
                 <filtering>true</filtering>
-		        <includes>
-	                <include>**/*.py</include>
-	            </includes>
+                <includes>
+                    <include>**/*.py</include>
+                </includes>
+                <targetPath>bin</targetPath>
+            </resource>
+            <resource>
+                <directory>src/conf</directory>
+                <filtering>true</filtering>
+                <targetPath>conf</targetPath>
             </resource>
         </resources>
         <plugins>
@@ -133,8 +286,7 @@
     <dependencies>
         <dependency>
             <groupId>org.apache.atlas</groupId>
-            <artifactId>hive-bridge</artifactId>
-            <version>0.6-incubating-SNAPSHOT</version>
+            <artifactId>storm-bridge</artifactId>
         </dependency>
     </dependencies>
 </project>

@@ -22,7 +22,9 @@ import java.util
 import java.util.concurrent.atomic.AtomicInteger
 
 import org.apache.atlas.AtlasException
-import org.apache.atlas.query.Expressions.{PathExpression, SelectExpression}
+import org.apache.atlas.query.Expressions.{LimitExpression, PathExpression, SelectExpression}
+import org.apache.atlas.repository.Constants
+import org.apache.atlas.repository.graph.GraphHelper
 import org.apache.atlas.typesystem.types.DataTypes.{ArrayType, PrimitiveType, TypeCategory}
 import org.apache.atlas.typesystem.types._
 
@@ -79,7 +81,7 @@ object TypeUtils {
         val resultAttr = new AttributeDefinition(resultAttrName, resultType.getName, Multiplicity.REQUIRED, false, null)
         val typName = s"${TEMP_STRUCT_NAME_PREFIX}${tempStructCounter.getAndIncrement}"
         val m : java.util.HashMap[String, IDataType[_]] = new util.HashMap[String, IDataType[_]]()
-        if ( pE.child.isInstanceOf[SelectExpression]) {
+        if (pE.child.isInstanceOf[SelectExpression] || pE.child.isInstanceOf[LimitExpression]) {
           m.put(pE.child.dataType.getName, pE.child.dataType)
         }
         typSystem.defineQueryResultType(typName, m, pathAttr, resultAttr);
@@ -201,6 +203,11 @@ object TypeUtils {
 
             if (fMap.get.fields.containsKey(id)) {
                 return Some(FieldInfo(typ,fMap.get.fields.get(id)))
+            }
+
+            val systemField = GraphHelper.getAttributeInfoForSystemAttributes(id)
+            if (systemField != null) {
+              return Some(FieldInfo(systemField.dataType(), systemField))
             }
 
             try {

@@ -19,8 +19,10 @@
 package org.apache.atlas.typesystem.types;
 
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
+
 import org.apache.atlas.AtlasException;
 import org.apache.atlas.typesystem.Referenceable;
 import org.apache.atlas.typesystem.Struct;
@@ -37,8 +39,8 @@ public abstract class BaseTest {
 
     public static final String STRUCT_TYPE_1 = "t1";
     public static final String STRUCT_TYPE_2 = "t2";
+    public static final String STRUCT_TYPE_3 = "t3";
     public static final String TEST_DATE = "2014-12-11T02:35:58.440Z";
-    public static final long TEST_DATE_IN_LONG = 1418265358440L;
 
     public static Struct createStruct() throws AtlasException {
         StructType structType = TypeSystem.getInstance().getDataType(StructType.class, STRUCT_TYPE_1);
@@ -61,6 +63,11 @@ public abstract class BaseTest {
         hm.put("a", 1.0);
         hm.put("b", 2.0);
         s.set("o", hm);
+        s.set("p", "");
+        s.setNull("q");
+        Map<String, String> hm2 = Maps.newHashMap();
+        hm2.put("a", "");
+        s.set("r", hm2);
         return s;
     }
 
@@ -88,13 +95,20 @@ public abstract class BaseTest {
                         TypesUtil.createOptionalAttrDef("l", DataTypes.DATE_TYPE),
                         TypesUtil.createOptionalAttrDef("m", ts.defineArrayType(DataTypes.INT_TYPE)),
                         TypesUtil.createOptionalAttrDef("n", ts.defineArrayType(DataTypes.BIGDECIMAL_TYPE)),
-                        TypesUtil.createOptionalAttrDef("o", ts.defineMapType(DataTypes.STRING_TYPE, DataTypes.DOUBLE_TYPE)));
+                        TypesUtil.createOptionalAttrDef("o", ts.defineMapType(DataTypes.STRING_TYPE, DataTypes.DOUBLE_TYPE)),
+                        TypesUtil.createOptionalAttrDef("p", DataTypes.STRING_TYPE),
+                        TypesUtil.createOptionalAttrDef("q", DataTypes.STRING_TYPE),
+                        TypesUtil.createOptionalAttrDef("r", ts.defineMapType(DataTypes.STRING_TYPE, DataTypes.STRING_TYPE)));
         System.out.println("defined structType = " + structType);
 
         StructType recursiveStructType =
                 ts.defineStructType(STRUCT_TYPE_2, true, TypesUtil.createRequiredAttrDef("a", DataTypes.INT_TYPE),
                         TypesUtil.createOptionalAttrDef("s", STRUCT_TYPE_2));
         System.out.println("defined recursiveStructType = " + recursiveStructType);
+
+        StructType invalidStructType =
+                ts.defineStructType(STRUCT_TYPE_3, true, TypesUtil.createRequiredAttrDef("a",DataTypes.STRING_TYPE));
+        System.out.println("defined structType = " + invalidStructType);
     }
 
     protected Map<String, IDataType> defineTraits(HierarchicalTypeDefinition<TraitType>... tDefs)
@@ -118,22 +132,22 @@ public abstract class BaseTest {
     protected void defineDeptEmployeeTypes(TypeSystem ts) throws AtlasException {
 
         HierarchicalTypeDefinition<ClassType> deptTypeDef = TypesUtil
-                .createClassTypeDef("Department", ImmutableList.<String>of(),
+                .createClassTypeDef("Department", ImmutableSet.<String>of(),
                         TypesUtil.createRequiredAttrDef("name", DataTypes.STRING_TYPE),
                         new AttributeDefinition("employees", String.format("array<%s>", "Person"),
                                 Multiplicity.COLLECTION, true, "department"));
         HierarchicalTypeDefinition<ClassType> personTypeDef = TypesUtil
-                .createClassTypeDef("Person", ImmutableList.<String>of(),
+                .createClassTypeDef("Person", ImmutableSet.<String>of(),
                         TypesUtil.createRequiredAttrDef("name", DataTypes.STRING_TYPE),
                         new AttributeDefinition("department", "Department", Multiplicity.REQUIRED, false, "employees"),
                         new AttributeDefinition("manager", "Manager", Multiplicity.OPTIONAL, false, "subordinates"));
         HierarchicalTypeDefinition<ClassType> managerTypeDef = TypesUtil
-                .createClassTypeDef("Manager", ImmutableList.of("Person"),
+                .createClassTypeDef("Manager", ImmutableSet.of("Person"),
                         new AttributeDefinition("subordinates", String.format("array<%s>", "Person"),
                                 Multiplicity.COLLECTION, false, "manager"));
 
         HierarchicalTypeDefinition<TraitType> securityClearanceTypeDef = TypesUtil
-                .createTraitTypeDef("SecurityClearance", ImmutableList.<String>of(),
+                .createTraitTypeDef("SecurityClearance", ImmutableSet.<String>of(),
                         TypesUtil.createRequiredAttrDef("level", DataTypes.INT_TYPE));
 
         ts.defineTypes(ImmutableList.<EnumTypeDefinition>of(), ImmutableList.<StructTypeDefinition>of(),

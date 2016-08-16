@@ -1,10 +1,11 @@
-/*
- * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with
- * this work for additional information regarding copyright ownership.
- * The ASF licenses this file to You under the Apache License, Version 2.0
- * (the "License"); you may not use this file except in compliance with
- * the License.  You may obtain a copy of the License at
+/**
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
  *
  *     http://www.apache.org/licenses/LICENSE-2.0
  *
@@ -14,10 +15,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package org.apache.atlas;
 
-import org.apache.commons.configuration.CompositeConfiguration;
+import org.apache.atlas.security.InMemoryJAASConfiguration;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.configuration.PropertiesConfiguration;
@@ -26,39 +26,63 @@ import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.net.URL;
-import java.util.Arrays;
 import java.util.Iterator;
 
-public class ApplicationProperties extends PropertiesConfiguration {
+/**
+ * Application properties used by Atlas.
+ */
+public final class ApplicationProperties extends PropertiesConfiguration {
     private static final Logger LOG = LoggerFactory.getLogger(ApplicationProperties.class);
 
-    public static final String APPLICATION_PROPERTIES = "application.properties";
-    public static final String CLIENT_PROPERTIES = "client.properties";
+    public static final String APPLICATION_PROPERTIES = "atlas-application.properties";
 
-    private static Configuration INSTANCE = null;
+    private static volatile Configuration instance = null;
 
     private ApplicationProperties(URL url) throws ConfigurationException {
         super(url);
     }
 
-    public static Configuration get() throws AtlasException {
-        if (INSTANCE == null) {
+    public static void forceReload() {
+        if (instance != null) {
             synchronized (ApplicationProperties.class) {
-                if (INSTANCE == null) {
-                    Configuration applicationProperties = get(APPLICATION_PROPERTIES);
-                    Configuration clientProperties = get(CLIENT_PROPERTIES);
-                    INSTANCE = new CompositeConfiguration(Arrays.asList(applicationProperties, clientProperties));
+                if (instance != null) {
+                    instance = null;
                 }
             }
         }
-        return INSTANCE;
+    }
+
+    public static Configuration get() throws AtlasException {
+        if (instance == null) {
+            synchronized (ApplicationProperties.class) {
+                if (instance == null) {
+                    instance = get(APPLICATION_PROPERTIES);
+                    InMemoryJAASConfiguration.init(instance);
+                }
+            }
+        }
+        return instance;
     }
 
     public static Configuration get(String fileName) throws AtlasException {
         String confLocation = System.getProperty("atlas.conf");
         try {
-            URL url = confLocation == null ? ApplicationProperties.class.getResource("/" + fileName)
-                    : new File(confLocation, fileName).toURI().toURL();
+            URL url = null;
+
+            if (confLocation == null) {
+                LOG.info("Looking for {} in classpath", fileName);
+
+                url = ApplicationProperties.class.getClassLoader().getResource(fileName);
+
+                if (url == null) {
+                    LOG.info("Looking for /{} in classpath", fileName);
+
+                    url = ApplicationProperties.class.getClassLoader().getResource("/" + fileName);
+                }
+            } else {
+                url = new File(confLocation, fileName).toURI().toURL();
+            }
+
             LOG.info("Loading {} from {}", fileName, url);
 
             Configuration configuration = new ApplicationProperties(url).interpolatedConfiguration();
@@ -80,7 +104,25 @@ public class ApplicationProperties extends PropertiesConfiguration {
         }
     }
 
-    public static final Configuration getSubsetConfiguration(Configuration inConf, String prefix) {
+    public static Configuration getSubsetConfiguration(Configuration inConf, String prefix) {
         return inConf.subset(prefix);
+    }
+
+    public static Class getClass(Configuration configuration, String propertyName, String defaultValue,
+                                 Class assignableClass) throws AtlasException {
+        try {
+            String propertyValue = configuration.getString(propertyName, defaultValue);
+            Class<?> clazz = Class.forName(propertyValue);
+            if (assignableClass == null || assignableClass.isAssignableFrom(clazz)) {
+                return clazz;
+            } else {
+                String message = "Class " + clazz.getName() + " specified in property " + propertyName
+                        + " is not assignable to class " + assignableClass.getName();
+                LOG.error(message);
+                throw new AtlasException(message);
+            }
+        } catch (Exception e) {
+            throw new AtlasException(e);
+        }
     }
 }

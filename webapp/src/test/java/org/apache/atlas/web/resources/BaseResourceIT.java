@@ -20,11 +20,14 @@ package org.apache.atlas.web.resources;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
-import com.sun.jersey.api.client.Client;
-import com.sun.jersey.api.client.ClientResponse;
+import com.google.common.collect.ImmutableSet;
 import com.sun.jersey.api.client.WebResource;
-import com.sun.jersey.api.client.config.DefaultClientConfig;
-import org.apache.atlas.*;
+import kafka.consumer.ConsumerTimeoutException;
+import org.apache.atlas.ApplicationProperties;
+import org.apache.atlas.AtlasClient;
+import org.apache.atlas.AtlasServiceException;
+import org.apache.atlas.notification.NotificationConsumer;
+import org.apache.atlas.notification.entity.EntityNotification;
 import org.apache.atlas.typesystem.Referenceable;
 import org.apache.atlas.typesystem.Struct;
 import org.apache.atlas.typesystem.TypesDef;
@@ -41,21 +44,18 @@ import org.apache.atlas.typesystem.types.IDataType;
 import org.apache.atlas.typesystem.types.Multiplicity;
 import org.apache.atlas.typesystem.types.StructTypeDefinition;
 import org.apache.atlas.typesystem.types.TraitType;
+import org.apache.atlas.typesystem.types.TypeUtils;
 import org.apache.atlas.typesystem.types.utils.TypesUtil;
+import org.apache.atlas.utils.AuthenticationUtil;
 import org.apache.atlas.utils.ParamChecker;
-import org.apache.atlas.web.util.Servlets;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.lang.RandomStringUtils;
 import org.codehaus.jettison.json.JSONArray;
-import org.codehaus.jettison.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.Assert;
 import org.testng.annotations.BeforeClass;
 
-import javax.ws.rs.HttpMethod;
-import javax.ws.rs.core.Response;
-import javax.ws.rs.core.UriBuilder;
 import java.util.List;
 
 /**
@@ -68,18 +68,25 @@ public abstract class BaseResourceIT {
     protected WebResource service;
     protected AtlasClient serviceClient;
     public static final Logger LOG = LoggerFactory.getLogger(BaseResourceIT.class);
+    protected static final int MAX_WAIT_TIME = 60000;
+    protected String[] atlasUrls;
 
     @BeforeClass
     public void setUp() throws Exception {
 
-        DefaultClientConfig config = new DefaultClientConfig();
-        Client client = Client.create(config);
         Configuration configuration = ApplicationProperties.get();
-        String baseUrl = configuration.getString(ATLAS_REST_ADDRESS, "http://localhost:21000/");
-        client.resource(UriBuilder.fromUri(baseUrl).build());
+        atlasUrls = configuration.getStringArray(ATLAS_REST_ADDRESS);
 
-        service = client.resource(UriBuilder.fromUri(baseUrl).build());
-        serviceClient = new AtlasClient(baseUrl);
+        if (atlasUrls == null || atlasUrls.length == 0) {
+            atlasUrls = new String[] { "http://localhost:21000/" };
+        }
+
+        if (!AuthenticationUtil.isKerberosAuthenticationEnabled()) {
+            serviceClient = new AtlasClient(atlasUrls, new String[]{"admin", "admin"});
+        } else {
+            serviceClient = new AtlasClient(atlasUrls);
+        }
+        service = serviceClient.getResource();
     }
 
     protected void createType(TypesDef typesDef) throws Exception {
@@ -94,19 +101,8 @@ public abstract class BaseResourceIT {
         }
     }
 
-    protected void createType(String typesAsJSON) throws Exception {
-        WebResource resource = service.path("api/atlas/types");
-
-        ClientResponse clientResponse = resource.accept(Servlets.JSON_MEDIA_TYPE).type(Servlets.JSON_MEDIA_TYPE)
-                .method(HttpMethod.POST, ClientResponse.class, typesAsJSON);
-        Assert.assertEquals(clientResponse.getStatus(), Response.Status.CREATED.getStatusCode());
-
-        String responseAsString = clientResponse.getEntity(String.class);
-        Assert.assertNotNull(responseAsString);
-
-        JSONObject response = new JSONObject(responseAsString);
-        Assert.assertNotNull(response.get("types"));
-        Assert.assertNotNull(response.get(AtlasClient.REQUEST_ID));
+    protected List<String> createType(String typesAsJSON) throws Exception {
+        return serviceClient.createType(TypesSerialization.fromJson(typesAsJSON));
     }
 
     protected Id createInstance(Referenceable referenceable) throws Exception {
@@ -115,11 +111,14 @@ public abstract class BaseResourceIT {
 
         String entityJSON = InstanceSerialization.toJson(referenceable, true);
         System.out.println("Submitting new entity= " + entityJSON);
-        JSONArray guids = serviceClient.createEntity(entityJSON);
+        List<String> guids = serviceClient.createEntity(entityJSON);
         System.out.println("created instance for type " + typeName + ", guid: " + guids);
 
         // return the reference to created instance with guid
-        return new Id(guids.getString(0), 0, referenceable.getTypeName());
+        if (guids.size() > 0) {
+            return new Id(guids.get(guids.size() - 1), 0, referenceable.getTypeName());
+        }
+        return null;
     }
 
     protected static final String DATABASE_TYPE = "hive_db";
@@ -148,7 +147,7 @@ public abstract class BaseResourceIT {
         EnumTypeDefinition enumTypeDefinition = new EnumTypeDefinition("tableType", values);
 
         HierarchicalTypeDefinition<ClassType> tblClsDef = TypesUtil
-                .createClassTypeDef(HIVE_TABLE_TYPE, ImmutableList.of("DataSet"),
+                .createClassTypeDef(HIVE_TABLE_TYPE, ImmutableSet.of("DataSet"),
                         attrDef("owner", DataTypes.STRING_TYPE), attrDef("createTime", DataTypes.LONG_TYPE),
                         attrDef("lastAccessTime", DataTypes.DATE_TYPE),
                         attrDef("temporary", DataTypes.BOOLEAN_TYPE),
@@ -160,7 +159,7 @@ public abstract class BaseResourceIT {
                 new AttributeDefinition("serde2", "serdeType", Multiplicity.OPTIONAL, false, null));
 
         HierarchicalTypeDefinition<ClassType> loadProcessClsDef = TypesUtil
-                .createClassTypeDef(HIVE_PROCESS_TYPE, ImmutableList.of("Process"),
+                .createClassTypeDef(HIVE_PROCESS_TYPE, ImmutableSet.of("Process"),
                         attrDef("userName", DataTypes.STRING_TYPE), attrDef("startTime", DataTypes.INT_TYPE),
                         attrDef("endTime", DataTypes.LONG_TYPE),
                         attrDef("queryText", DataTypes.STRING_TYPE, Multiplicity.REQUIRED),
@@ -169,33 +168,24 @@ public abstract class BaseResourceIT {
                         attrDef("queryGraph", DataTypes.STRING_TYPE, Multiplicity.REQUIRED));
 
         HierarchicalTypeDefinition<TraitType> classificationTrait = TypesUtil
-                .createTraitTypeDef("classification", ImmutableList.<String>of(),
+                .createTraitTypeDef("classification", ImmutableSet.<String>of(),
                         TypesUtil.createRequiredAttrDef("tag", DataTypes.STRING_TYPE));
         HierarchicalTypeDefinition<TraitType> piiTrait =
-                TypesUtil.createTraitTypeDef("pii", ImmutableList.<String>of());
+                TypesUtil.createTraitTypeDef("pii", ImmutableSet.<String>of());
         HierarchicalTypeDefinition<TraitType> phiTrait =
-                TypesUtil.createTraitTypeDef("phi", ImmutableList.<String>of());
+                TypesUtil.createTraitTypeDef("phi", ImmutableSet.<String>of());
         HierarchicalTypeDefinition<TraitType> pciTrait =
-                TypesUtil.createTraitTypeDef("pci", ImmutableList.<String>of());
+                TypesUtil.createTraitTypeDef("pci", ImmutableSet.<String>of());
         HierarchicalTypeDefinition<TraitType> soxTrait =
-                TypesUtil.createTraitTypeDef("sox", ImmutableList.<String>of());
+                TypesUtil.createTraitTypeDef("sox", ImmutableSet.<String>of());
         HierarchicalTypeDefinition<TraitType> secTrait =
-                TypesUtil.createTraitTypeDef("sec", ImmutableList.<String>of());
+                TypesUtil.createTraitTypeDef("sec", ImmutableSet.<String>of());
         HierarchicalTypeDefinition<TraitType> financeTrait =
-                TypesUtil.createTraitTypeDef("finance", ImmutableList.<String>of());
-
-        HierarchicalTypeDefinition<TraitType> dimTraitDef = TypesUtil.createTraitTypeDef("Dimension", null);
-
-        HierarchicalTypeDefinition<TraitType> factTraitDef = TypesUtil.createTraitTypeDef("Fact", null);
-
-        HierarchicalTypeDefinition<TraitType> metricTraitDef = TypesUtil.createTraitTypeDef("Metric", null);
-
-        HierarchicalTypeDefinition<TraitType> etlTraitDef = TypesUtil.createTraitTypeDef("ETL", null);
+                TypesUtil.createTraitTypeDef("finance", ImmutableSet.<String>of());
 
         TypesDef typesDef = TypesUtil.getTypesDef(ImmutableList.of(enumTypeDefinition),
                 ImmutableList.of(structTypeDefinition),
-                ImmutableList.of(classificationTrait, piiTrait, phiTrait, pciTrait, soxTrait, secTrait, financeTrait,
-                        dimTraitDef, factTraitDef, metricTraitDef, etlTraitDef),
+                ImmutableList.of(classificationTrait, piiTrait, phiTrait, pciTrait, soxTrait, secTrait, financeTrait),
                 ImmutableList.of(dbClsDef, columnClsDef, tblClsDef, loadProcessClsDef));
 
         createType(typesDef);
@@ -228,6 +218,7 @@ public abstract class BaseResourceIT {
         Referenceable tableInstance =
                 new Referenceable(HIVE_TABLE_TYPE, "classification", "pii", "phi", "pci", "sox", "sec", "finance");
         tableInstance.set("name", tableName);
+        tableInstance.set(AtlasClient.REFERENCEABLE_ATTRIBUTE_NAME, tableName);
         tableInstance.set("db", databaseInstance);
         tableInstance.set("description", "bar table");
         tableInstance.set("lastAccessTime", "2014-07-11T08:00:00.000Z");
@@ -266,6 +257,17 @@ public abstract class BaseResourceIT {
         boolean evaluate() throws Exception;
     }
 
+    public interface NotificationPredicate {
+
+        /**
+         * Perform a predicate evaluation.
+         *
+         * @return the boolean result of the evaluation.
+         * @throws Exception thrown if the predicate evaluation could not evaluate.
+         */
+        boolean evaluate(EntityNotification notification) throws Exception;
+    }
+
     /**
      * Wait for a condition, expressed via a {@link Predicate} to become true.
      *
@@ -284,5 +286,46 @@ public abstract class BaseResourceIT {
         if (!eval) {
             throw new Exception("Waiting timed out after " + timeout + " msec");
         }
+    }
+
+    protected EntityNotification waitForNotification(final NotificationConsumer<EntityNotification> consumer, int maxWait,
+                                                     final NotificationPredicate predicate) throws Exception {
+        final TypeUtils.Pair<EntityNotification, String> pair = TypeUtils.Pair.of(null, null);
+        final long maxCurrentTime = System.currentTimeMillis() + maxWait;
+        waitFor(maxWait, new Predicate() {
+            @Override
+            public boolean evaluate() throws Exception {
+                try {
+                    while (consumer.hasNext() && System.currentTimeMillis() < maxCurrentTime) {
+                        EntityNotification notification = consumer.next();
+                        if (predicate.evaluate(notification)) {
+                            pair.left = notification;
+                            return true;
+                        }
+                    }
+                } catch(ConsumerTimeoutException e) {
+                    //ignore
+                }
+                return false;
+            }
+        });
+        return pair.left;
+    }
+
+    protected NotificationPredicate newNotificationPredicate(final EntityNotification.OperationType operationType,
+                                                             final String typeName, final String guid) {
+        return new NotificationPredicate() {
+            @Override
+            public boolean evaluate(EntityNotification notification) throws Exception {
+                return notification != null &&
+                        notification.getOperationType() == operationType &&
+                        notification.getEntity().getTypeName().equals(typeName) &&
+                        notification.getEntity().getId()._getId().equals(guid);
+            }
+        };
+    }
+
+    protected JSONArray searchByDSL(String dslQuery) throws AtlasServiceException {
+        return serviceClient.searchByDSL(dslQuery, 10, 0);
     }
 }

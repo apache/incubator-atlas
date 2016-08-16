@@ -19,11 +19,24 @@
 package org.apache.atlas.typesystem.types;
 
 import com.google.common.collect.ImmutableSortedMap;
+
 import org.apache.atlas.AtlasException;
 
+import java.io.IOException;
 import java.util.Map;
+import java.util.Set;
 
 abstract class AbstractDataType<T> implements IDataType<T> {
+
+    public final String name;
+    public final String description;
+    
+    public AbstractDataType(String name, String description) {
+
+        super();
+        this.name = name;
+        this.description = description;
+    }
 
     protected T convertNull(Multiplicity m) throws AtlasException {
         if (!m.nullAllowed()) {
@@ -33,13 +46,37 @@ abstract class AbstractDataType<T> implements IDataType<T> {
     }
 
     @Override
-    public void output(T val, Appendable buf, String prefix) throws AtlasException {
-        if (val instanceof Map) {
+    public void output(T val, Appendable buf, String prefix, Set<T> inProcess) throws AtlasException {
+        final String strValue;
+
+        if (val == null) {
+            strValue = "<null>";
+        } else if (val instanceof Map) {
             ImmutableSortedMap immutableSortedMap = ImmutableSortedMap.copyOf((Map) val);
-            TypeUtils.outputVal(val == null ? "<null>" : immutableSortedMap.toString(), buf, prefix);
+            strValue = immutableSortedMap.toString();
         } else {
-            TypeUtils.outputVal(val == null ? "<null>" : val.toString(), buf, prefix);
+            strValue = val.toString();
         }
+
+        TypeUtils.outputVal(strValue, buf, prefix);
+    }
+
+    @Override
+    public void output(Appendable buf, Set<String> typesInProcess) throws AtlasException {
+
+        try {
+            buf.append(toString());
+        } catch (IOException e) {
+            throw new AtlasException(e);
+        }
+    }
+
+    /* (non-Javadoc)
+     * @see java.lang.Object#toString()
+     */
+    @Override
+    public String toString() {
+        return "{name=" + name + ", description=" + description + "}";
     }
 
     /**
@@ -51,6 +88,16 @@ abstract class AbstractDataType<T> implements IDataType<T> {
         if (!getName().equals(newType.getName()) || !getClass().getName().equals(newType.getClass().getName())) {
             throw new TypeUpdateException(newType);
         }
+    }
+
+    @Override
+    public String getName() {
+        return name;
+    }
+
+    @Override
+    public String getDescription() {
+        return description;
     }
 }
 

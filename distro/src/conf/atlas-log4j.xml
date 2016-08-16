@@ -23,45 +23,78 @@
     <appender name="console" class="org.apache.log4j.ConsoleAppender">
         <param name="Target" value="System.out"/>
         <layout class="org.apache.log4j.PatternLayout">
-            <param name="ConversionPattern" value="%d %-5p - [%t:%x] ~ %m (%c{1}:%L)%n"/>
+            <param name="ConversionPattern" value="%d %-5p - [%t:%x] ~ %m (%C{1}:%L)%n"/>
         </layout>
     </appender>
 
     <appender name="FILE" class="org.apache.log4j.DailyRollingFileAppender">
         <param name="File" value="${atlas.log.dir}/${atlas.log.file}"/>
         <param name="Append" value="true"/>
-        <param name="Threshold" value="debug"/>
         <layout class="org.apache.log4j.PatternLayout">
-            <param name="ConversionPattern" value="%d %-5p - [%t:%x] ~ %m (%c{1}:%L)%n"/>
+            <param name="ConversionPattern" value="%d %-5p - [%t:%x] ~ %m (%C{1}:%L)%n"/>
         </layout>
     </appender>
 
     <appender name="AUDIT" class="org.apache.log4j.DailyRollingFileAppender">
         <param name="File" value="${atlas.log.dir}/audit.log"/>
         <param name="Append" value="true"/>
-        <param name="Threshold" value="debug"/>
         <layout class="org.apache.log4j.PatternLayout">
             <param name="ConversionPattern" value="%d %x %m%n"/>
         </layout>
     </appender>
 
-    <logger name="org.apache.atlas" additivity="false">
-        <level value="debug"/>
-        <appender-ref ref="FILE"/>
-    </logger>
+    <appender name="FAILED" class="org.apache.log4j.DailyRollingFileAppender">
+        <param name="File" value="${atlas.log.dir}/failed.log"/>
+        <param name="Append" value="true"/>
+        <layout class="org.apache.log4j.PatternLayout">
+            <param name="ConversionPattern" value="%d %m"/>
+        </layout>
+    </appender>
 
-    <logger name="com.thinkaurelius.titan" additivity="false">
+    <logger name="org.apache.atlas" additivity="false">
         <level value="info"/>
         <appender-ref ref="FILE"/>
     </logger>
 
-    <logger name="AUDIT">
+    <!-- uncomment this block to generate performance traces
+    <appender name="perf_appender" class="org.apache.log4j.DailyRollingFileAppender">
+        <param name="file" value="${atlas.log.dir}/atlas_perf.log" />
+        <param name="datePattern" value="'.'yyyy-MM-dd" />
+        <param name="append" value="true" />
+        <layout class="org.apache.log4j.PatternLayout">
+            <param name="ConversionPattern" value="%d|%t|%m%n" />
+        </layout>
+    </appender>
+
+    <logger name="org.apache.atlas.perf" additivity="false">
+        <level value="debug" />
+        <appender-ref ref="perf_appender" />
+    </logger>
+    -->
+
+    <logger name="com.thinkaurelius.titan" additivity="false">
+        <level value="warn"/>
+        <appender-ref ref="FILE"/>
+    </logger>
+
+    <!-- to avoid logs - The configuration log.flush.interval.messages = 1 was supplied but isn't a known config -->
+    <logger name="org.apache.kafka.common.config.AbstractConfig" additivity="false">
+        <level value="error"/>
+        <appender-ref ref="FILE"/>
+    </logger>
+
+    <logger name="AUDIT" additivity="false">
+        <level value="info"/>
+        <appender-ref ref="AUDIT"/>
+    </logger>
+
+    <logger name="FAILED" additivity="false">
         <level value="info"/>
         <appender-ref ref="AUDIT"/>
     </logger>
 
     <root>
-        <priority value="info"/>
+        <priority value="warn"/>
         <appender-ref ref="FILE"/>
     </root>
 

@@ -21,6 +21,8 @@ package org.apache.atlas.typesystem.types;
 import com.google.common.collect.ImmutableBiMap;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSet;
+
 import org.apache.atlas.AtlasException;
 import org.apache.atlas.typesystem.IReferenceableInstance;
 import org.apache.atlas.typesystem.IStruct;
@@ -39,6 +41,7 @@ import java.security.MessageDigest;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 public class ClassType extends HierarchicalType<ClassType, IReferenceableInstance>
         implements IConstructableType<IReferenceableInstance, ITypedReferenceableInstance> {
@@ -47,17 +50,14 @@ public class ClassType extends HierarchicalType<ClassType, IReferenceableInstanc
 
     public final Map<AttributeInfo, List<String>> infoToNameMap;
 
-    /**
-     * Used when creating a ClassType, to support recursive Structs.
-     */
-    ClassType(TypeSystem typeSystem, String name, ImmutableList<String> superTypes, int numFields) {
-        super(typeSystem, ClassType.class, name, superTypes, numFields);
+    ClassType(TypeSystem typeSystem, String name, String description, ImmutableSet<String> superTypes, int numFields) {
+        super(typeSystem, ClassType.class, name, description, superTypes, numFields);
         infoToNameMap = null;
     }
 
-    ClassType(TypeSystem typeSystem, String name, ImmutableList<String> superTypes, AttributeInfo... fields)
+    ClassType(TypeSystem typeSystem, String name, String description, ImmutableSet<String> superTypes, AttributeInfo... fields)
     throws AtlasException {
-        super(typeSystem, ClassType.class, name, superTypes, fields);
+        super(typeSystem, ClassType.class, name, description, superTypes, fields);
         infoToNameMap = TypeUtils.buildAttrInfoToNameMap(fieldMapping);
     }
 
@@ -68,7 +68,7 @@ public class ClassType extends HierarchicalType<ClassType, IReferenceableInstanc
 
     public void validateId(Id id) throws AtlasException {
         if (id != null) {
-            ClassType cType = typeSystem.getDataType(ClassType.class, id.className);
+            ClassType cType = typeSystem.getDataType(ClassType.class, id.typeName);
             if (isSubType(cType.getName())) {
                 return;
             }
@@ -125,9 +125,9 @@ public class ClassType extends HierarchicalType<ClassType, IReferenceableInstanc
                         r != null ? createInstanceWithTraits(id, r, r.getTraits().toArray(new String[0])) :
                                 createInstance(id);
 
-//                if (id != null && id.isAssigned()) {
-//                    return tr;
-//                }
+                if (id != null && id.isAssigned()) {
+                    return tr;
+                }
 
                 for (Map.Entry<String, AttributeInfo> e : fieldMapping.fields.entrySet()) {
                     String attrKey = e.getKey();
@@ -151,7 +151,7 @@ public class ClassType extends HierarchicalType<ClassType, IReferenceableInstanc
                 validateId(((ReferenceableInstance) val).getId());
                 return (ReferenceableInstance) val;
             } else {
-                throw new ValueConversionException(this, val);
+                throw new ValueConversionException(this, val, "value's class is " + val.getClass().getName());
             }
         }
         if (!m.nullAllowed()) {
@@ -208,8 +208,8 @@ public class ClassType extends HierarchicalType<ClassType, IReferenceableInstanc
     }
 
     @Override
-    public void output(IReferenceableInstance s, Appendable buf, String prefix) throws AtlasException {
-        fieldMapping.output(s, buf, prefix);
+    public void output(IReferenceableInstance s, Appendable buf, String prefix, Set<IReferenceableInstance> inProcess) throws AtlasException {
+        fieldMapping.output(s, buf, prefix, inProcess);
     }
 
     @Override

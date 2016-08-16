@@ -18,10 +18,11 @@
 
 package org.apache.atlas.notification;
 
-import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
 import com.google.inject.Inject;
 import com.sun.jersey.api.client.ClientResponse;
 import com.sun.jersey.api.client.WebResource;
+import org.apache.atlas.AtlasClient;
 import org.apache.atlas.notification.entity.EntityNotification;
 import org.apache.atlas.typesystem.IReferenceableInstance;
 import org.apache.atlas.typesystem.IStruct;
@@ -35,10 +36,8 @@ import org.apache.atlas.typesystem.types.TraitType;
 import org.apache.atlas.typesystem.types.utils.TypesUtil;
 import org.apache.atlas.web.resources.BaseResourceIT;
 import org.apache.atlas.web.util.Servlets;
-import org.junit.AfterClass;
 import org.testng.Assert;
 import org.testng.annotations.BeforeClass;
-import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Guice;
 import org.testng.annotations.Test;
 
@@ -48,7 +47,9 @@ import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
 
-import static org.testng.Assert.*;
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertTrue;
 
 /**
  * Entity Notification Integration Tests.
@@ -58,14 +59,13 @@ public class EntityNotificationIT extends BaseResourceIT {
 
     private static final String ENTITIES = "api/atlas/entities";
     private static final String TRAITS = "traits";
-    private static final int MAX_WAIT_TIME = 10000;
     private final String DATABASE_NAME = "db" + randomString();
     private final String TABLE_NAME = "table" + randomString();
     @Inject
     private NotificationInterface notificationInterface;
-    private EntityNotificationConsumer notificationConsumer;
     private Id tableId;
     private String traitName;
+    private NotificationConsumer<EntityNotification> notificationConsumer;
 
     @BeforeClass
     public void setUp() throws Exception {
@@ -75,19 +75,7 @@ public class EntityNotificationIT extends BaseResourceIT {
         List<NotificationConsumer<EntityNotification>> consumers =
             notificationInterface.createConsumers(NotificationInterface.NotificationType.ENTITIES, 1);
 
-        NotificationConsumer<EntityNotification> consumer = consumers.iterator().next();
-        notificationConsumer = new EntityNotificationConsumer(consumer);
-        notificationConsumer.start();
-    }
-
-    @AfterClass
-    public void tearDown() {
-        notificationConsumer.stop();
-    }
-
-    @BeforeMethod
-    public void setupTest() {
-        notificationConsumer.reset();
+        notificationConsumer = consumers.iterator().next();
     }
 
     @Test
@@ -98,17 +86,8 @@ public class EntityNotificationIT extends BaseResourceIT {
 
         final String guid = tableId._getId();
 
-        waitForNotification(MAX_WAIT_TIME);
-
-        EntityNotification entityNotification = notificationConsumer.getLastEntityNotification();
-
-        assertNotNull(entityNotification);
-        assertEquals(EntityNotification.OperationType.ENTITY_CREATE, entityNotification.getOperationType());
-
-        IReferenceableInstance entity = entityNotification.getEntity();
-
-        assertEquals(HIVE_TABLE_TYPE, entity.getTypeName());
-        assertEquals(guid, entity.getId()._getId());
+        waitForNotification(notificationConsumer, MAX_WAIT_TIME,
+                newNotificationPredicate(EntityNotification.OperationType.ENTITY_CREATE, HIVE_TABLE_TYPE, guid));
     }
 
     @Test(dependsOnMethods = "testCreateEntity")
@@ -120,19 +99,27 @@ public class EntityNotificationIT extends BaseResourceIT {
 
         serviceClient.updateEntityAttribute(guid, property, newValue);
 
-        waitForNotification(MAX_WAIT_TIME);
+        waitForNotification(notificationConsumer, MAX_WAIT_TIME,
+                newNotificationPredicate(EntityNotification.OperationType.ENTITY_UPDATE, HIVE_TABLE_TYPE, guid));
+    }
 
-        EntityNotification entityNotification = notificationConsumer.getLastEntityNotification();
+    @Test
+    public void testDeleteEntity() throws Exception {
+        final String tableName = "table-" + randomString();
+        final String dbName = "db-" + randomString();
+        Referenceable tableInstance = createHiveTableInstance(dbName, tableName);
+        final Id tableId = createInstance(tableInstance);
+        final String guid = tableId._getId();
 
-        assertNotNull(entityNotification);
-        assertEquals(EntityNotification.OperationType.ENTITY_UPDATE, entityNotification.getOperationType());
+        waitForNotification(notificationConsumer, MAX_WAIT_TIME,
+            newNotificationPredicate(EntityNotification.OperationType.ENTITY_CREATE, HIVE_TABLE_TYPE, guid));
 
-        IReferenceableInstance entity = entityNotification.getEntity();
+        final String name = (String) tableInstance.get(AtlasClient.REFERENCEABLE_ATTRIBUTE_NAME);
 
-        assertEquals(HIVE_TABLE_TYPE, entity.getTypeName());
-        assertEquals(guid, entity.getId()._getId());
+        serviceClient.deleteEntity(HIVE_TABLE_TYPE, AtlasClient.REFERENCEABLE_ATTRIBUTE_NAME, name);
 
-        assertEquals(newValue, entity.getValuesMap().get(property));
+        waitForNotification(notificationConsumer, MAX_WAIT_TIME,
+            newNotificationPredicate(EntityNotification.OperationType.ENTITY_DELETE, HIVE_TABLE_TYPE, guid));
     }
 
     @Test(dependsOnMethods = "testCreateEntity")
@@ -155,18 +142,10 @@ public class EntityNotificationIT extends BaseResourceIT {
         ClientResponse clientResponse = addTrait(guid, traitInstanceJSON);
         assertEquals(clientResponse.getStatus(), Response.Status.CREATED.getStatusCode());
 
-        waitForNotification(MAX_WAIT_TIME);
-
-        EntityNotification entityNotification = notificationConsumer.getLastEntityNotification();
-
-        assertNotNull(entityNotification);
-        assertEquals(EntityNotification.OperationType.TRAIT_ADD, entityNotification.getOperationType());
+        EntityNotification entityNotification = waitForNotification(notificationConsumer, MAX_WAIT_TIME,
+                newNotificationPredicate(EntityNotification.OperationType.TRAIT_ADD, HIVE_TABLE_TYPE, guid));
 
         IReferenceableInstance entity = entityNotification.getEntity();
-
-        assertEquals(HIVE_TABLE_TYPE, entity.getTypeName());
-        assertEquals(guid, entity.getId()._getId());
-
         assertTrue(entity.getTraits().contains(traitName));
 
         List<IStruct> allTraits = entityNotification.getAllTraits();
@@ -179,9 +158,6 @@ public class EntityNotificationIT extends BaseResourceIT {
         assertTrue(allTraitNames.contains(superTraitName));
         assertTrue(allTraitNames.contains(superSuperTraitName));
 
-        // add another trait with the same super type to the entity
-        notificationConsumer.reset();
-
         String anotherTraitName = "Trait" + randomString();
         createTrait(anotherTraitName, superTraitName);
 
@@ -192,12 +168,8 @@ public class EntityNotificationIT extends BaseResourceIT {
         clientResponse = addTrait(guid, traitInstanceJSON);
         assertEquals(clientResponse.getStatus(), Response.Status.CREATED.getStatusCode());
 
-        waitForNotification(MAX_WAIT_TIME);
-
-        entityNotification = notificationConsumer.getLastEntityNotification();
-
-        assertNotNull(entityNotification);
-        assertEquals(EntityNotification.OperationType.TRAIT_ADD, entityNotification.getOperationType());
+        entityNotification = waitForNotification(notificationConsumer, MAX_WAIT_TIME,
+                newNotificationPredicate(EntityNotification.OperationType.TRAIT_ADD, HIVE_TABLE_TYPE, guid));
 
         allTraits = entityNotification.getAllTraits();
         allTraitNames = new LinkedList<>();
@@ -218,20 +190,10 @@ public class EntityNotificationIT extends BaseResourceIT {
         ClientResponse clientResponse = deleteTrait(guid, traitName);
         Assert.assertEquals(clientResponse.getStatus(), Response.Status.OK.getStatusCode());
 
-        waitForNotification(MAX_WAIT_TIME);
+        EntityNotification entityNotification = waitForNotification(notificationConsumer, MAX_WAIT_TIME,
+                newNotificationPredicate(EntityNotification.OperationType.TRAIT_DELETE, HIVE_TABLE_TYPE, guid));
 
-        EntityNotification entityNotification = notificationConsumer.getLastEntityNotification();
-
-        assertNotNull(entityNotification);
-        assertEquals(EntityNotification.OperationType.TRAIT_DELETE,
-            entityNotification.getOperationType());
-
-        IReferenceableInstance entity = entityNotification.getEntity();
-
-        assertEquals(HIVE_TABLE_TYPE, entity.getTypeName());
-        assertEquals(guid, entity.getId()._getId());
-
-        assertFalse(entity.getTraits().contains(traitName));
+        assertFalse(entityNotification.getEntity().getTraits().contains(traitName));
     }
 
 
@@ -239,7 +201,7 @@ public class EntityNotificationIT extends BaseResourceIT {
 
     private void createTrait(String traitName, String ... superTraitNames) throws Exception {
         HierarchicalTypeDefinition<TraitType> trait =
-            TypesUtil.createTraitTypeDef(traitName, ImmutableList.copyOf(superTraitNames));
+            TypesUtil.createTraitTypeDef(traitName, ImmutableSet.copyOf(superTraitNames));
 
         String traitDefinitionJSON = TypesSerialization$.MODULE$.toJson(trait, true);
         LOG.debug("Trait definition = " + traitDefinitionJSON);
@@ -259,52 +221,5 @@ public class EntityNotificationIT extends BaseResourceIT {
 
         return resource.accept(Servlets.JSON_MEDIA_TYPE).type(Servlets.JSON_MEDIA_TYPE)
             .method(HttpMethod.DELETE, ClientResponse.class);
-    }
-
-    private void waitForNotification(int maxWait) throws Exception {
-        waitFor(maxWait, new Predicate() {
-            @Override
-            public boolean evaluate() throws Exception {
-                return notificationConsumer.getLastEntityNotification() != null;
-            }
-        });
-    }
-
-
-    // ----- inner class : EntityNotificationConsumer --------------------------
-
-    private static class EntityNotificationConsumer implements Runnable {
-        private final NotificationConsumer<EntityNotification> consumerIterator;
-        private EntityNotification entityNotification = null;
-        private boolean run;
-
-        public EntityNotificationConsumer(NotificationConsumer<EntityNotification> consumerIterator) {
-            this.consumerIterator = consumerIterator;
-        }
-
-        @Override
-        public void run() {
-            while (run && consumerIterator.hasNext()) {
-                entityNotification = consumerIterator.next();
-            }
-        }
-
-        public void reset() {
-            entityNotification = null;
-        }
-
-        public void start() {
-            Thread thread = new Thread(this);
-            run = true;
-            thread.start();
-        }
-
-        public void stop() {
-            run = false;
-        }
-
-        public EntityNotification getLastEntityNotification() {
-            return entityNotification;
-        }
     }
 }

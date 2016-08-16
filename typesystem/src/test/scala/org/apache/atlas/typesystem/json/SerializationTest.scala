@@ -19,6 +19,7 @@
 package org.apache.atlas.typesystem.json
 
 import com.google.common.collect.ImmutableList
+import org.apache.atlas.typesystem.persistence.Id.EntityState
 import org.apache.atlas.typesystem.persistence.{Id, ReferenceableInstance, StructInstance}
 import org.apache.atlas.typesystem.types._
 import org.apache.atlas.typesystem.types.utils.TypesUtil
@@ -28,6 +29,8 @@ import org.json4s.native.Serialization.{write => swrite, _}
 import org.json4s.{NoTypeHints, _}
 import org.testng.Assert
 import org.testng.annotations.{BeforeMethod,Test}
+import com.google.common.collect.ImmutableSet
+import org.testng.Assert.assertEquals
 
 class SerializationTest extends BaseTest {
 
@@ -45,7 +48,7 @@ class SerializationTest extends BaseTest {
         val s: Struct = BaseTest.createStruct()
         val ts: ITypedStruct = structType.convert(s, Multiplicity.REQUIRED)
 
-        Assert.assertEquals(ts.toString, "{\n\ta : \t1\n\tb : \ttrue\n\tc : \t1\n\td : \t2\n\te : \t1\n\tf : \t1\n\tg : \t1\n\th : \t1.0\n\ti : \t1.0\n\tj : \t1\n\tk : \t1\n\tl : \t" + BaseTest.TEST_DATE + "\n\tm : \t[1, 1]\n\tn : \t[1.1, 1.1]\n\to : \t{a=1.0, b=2.0}\n}")
+        Assert.assertEquals(ts.toString, "{\n\ta : \t1\n\tb : \ttrue\n\tc : \t1\n\td : \t2\n\te : \t1\n\tf : \t1\n\tg : \t1\n\th : \t1.0\n\ti : \t1.0\n\tj : \t1\n\tk : \t1\n\tl : \t" + BaseTest.TEST_DATE + "\n\tm : \t[1, 1]\n\tn : \t[1.1, 1.1]\n\to : \t{a=1.0, b=2.0}\n\tp : \t\n\tq : \t<null>\n\tr : \t{a=}\n}")
 
         implicit val formats = org.json4s.native.Serialization.formats(NoTypeHints) + new TypedStructSerializer +
             new BigDecimalSerializer + new BigIntegerSerializer
@@ -53,10 +56,10 @@ class SerializationTest extends BaseTest {
         //Json representation
         val ser = swrite(ts)
         val ser1 = swrite(ts.toString)
-        Assert.assertEquals(ser1, "\"{\\n\\ta : \\t1\\n\\tb : \\ttrue\\n\\tc : \\t1\\n\\td : \\t2\\n\\te : \\t1\\n\\tf : \\t1\\n\\tg : \\t1\\n\\th : \\t1.0\\n\\ti : \\t1.0\\n\\tj : \\t1\\n\\tk : \\t1\\n\\tl : \\t" + BaseTest.TEST_DATE + "\\n\\tm : \\t[1, 1]\\n\\tn : \\t[1.1, 1.1]\\n\\to : \\t{a=1.0, b=2.0}\\n}\"");
+        Assert.assertEquals(ser1, "\"{\\n\\ta : \\t1\\n\\tb : \\ttrue\\n\\tc : \\t1\\n\\td : \\t2\\n\\te : \\t1\\n\\tf : \\t1\\n\\tg : \\t1\\n\\th : \\t1.0\\n\\ti : \\t1.0\\n\\tj : \\t1\\n\\tk : \\t1\\n\\tl : \\t" + BaseTest.TEST_DATE + "\\n\\tm : \\t[1, 1]\\n\\tn : \\t[1.1, 1.1]\\n\\to : \\t{a=1.0, b=2.0}\\n\\tp : \\t\\n\\tq : \\t<null>\\n\\tr : \\t{a=}\\n}\"");
         // Typed Struct read back
         val ts1 = read[StructInstance](ser)
-        Assert.assertEquals(ts1.toString, "{\n\ta : \t1\n\tb : \ttrue\n\tc : \t1\n\td : \t2\n\te : \t1\n\tf : \t1\n\tg : \t1\n\th : \t1.0\n\ti : \t1.0\n\tj : \t1\n\tk : \t1\n\tl : \t" + BaseTest.TEST_DATE + "\n\tm : \t[1, 1]\n\tn : \t[1.100000000000000088817841970012523233890533447265625, 1.100000000000000088817841970012523233890533447265625]\n\to : \t{a=1.0, b=2.0}\n}")
+        Assert.assertEquals(ts1.toString, "{\n\ta : \t1\n\tb : \ttrue\n\tc : \t1\n\td : \t2\n\te : \t1\n\tf : \t1\n\tg : \t1\n\th : \t1.0\n\ti : \t1.0\n\tj : \t1\n\tk : \t1\n\tl : \t" + BaseTest.TEST_DATE + "\n\tm : \t[1, 1]\n\tn : \t[1.100000000000000088817841970012523233890533447265625, 1.100000000000000088817841970012523233890533447265625]\n\to : \t{a=1.0, b=2.0}\n\tp : \t\n\tq : \t<null>\n\tr : \t{a=}\n}")
     }
 
     @Test def test2 {
@@ -71,7 +74,7 @@ class SerializationTest extends BaseTest {
         {"$typeName$":"t1","e":1,"n":[1.1,1.1],"h":1.0,"b":true,"k":1,"j":1,"d":2,"m":[1,1],"g":1,"a":1,"i":1.0,
         "c":1,"l":"2014-12-03T19:38:55.053Z","f":1,"o":{"a":1.0,"b":2.0}}""")
         // Typed Struct read from string
-        Assert.assertEquals(ts1.toString, "{\n\ta : \t1\n\tb : \ttrue\n\tc : \t1\n\td : \t2\n\te : \t1\n\tf : \t1\n\tg : \t1\n\th : \t1.0\n\ti : \t1.0\n\tj : \t1\n\tk : \t1\n\tl : \t2014-12-03T19:38:55.053Z\n\tm : \t[1, 1]\n\tn : \t[1.100000000000000088817841970012523233890533447265625, 1.100000000000000088817841970012523233890533447265625]\n\to : \t{a=1.0, b=2.0}\n}")
+        Assert.assertEquals(ts1.toString, "{\n\ta : \t1\n\tb : \ttrue\n\tc : \t1\n\td : \t2\n\te : \t1\n\tf : \t1\n\tg : \t1\n\th : \t1.0\n\ti : \t1.0\n\tj : \t1\n\tk : \t1\n\tl : \t2014-12-03T19:38:55.053Z\n\tm : \t[1, 1]\n\tn : \t[1.100000000000000088817841970012523233890533447265625, 1.100000000000000088817841970012523233890533447265625]\n\to : \t{a=1.0, b=2.0}\n\tp : \t<null>\n\tq : \t<null>\n\tr : \t<null>\n}")
     }
 
     @Test def testTrait {
@@ -81,13 +84,13 @@ class SerializationTest extends BaseTest {
             TypesUtil.createOptionalAttrDef("c", DataTypes.BYTE_TYPE),
             TypesUtil.createOptionalAttrDef("d", DataTypes.SHORT_TYPE))
         val B: HierarchicalTypeDefinition[TraitType] = TypesUtil.createTraitTypeDef(
-            "B", ImmutableList.of[String]("A"),
+            "B", ImmutableSet.of[String]("A"),
             TypesUtil.createOptionalAttrDef("b", DataTypes.BOOLEAN_TYPE))
         val C: HierarchicalTypeDefinition[TraitType] = TypesUtil.createTraitTypeDef(
-            "C", ImmutableList.of[String]("A"),
+            "C", ImmutableSet.of[String]("A"),
             TypesUtil.createOptionalAttrDef("c", DataTypes.BYTE_TYPE))
         val D: HierarchicalTypeDefinition[TraitType] = TypesUtil.createTraitTypeDef(
-            "D", ImmutableList.of[String]("B", "C"),
+            "D", ImmutableSet.of[String]("B", "C"),
             TypesUtil.createOptionalAttrDef("d", DataTypes.SHORT_TYPE))
 
         defineTraits(A, B, C, D)
@@ -130,21 +133,21 @@ class SerializationTest extends BaseTest {
   def defineHRTypes(ts: TypeSystem) : Unit = {
     val deptTypeDef: HierarchicalTypeDefinition[ClassType] = TypesUtil.createClassTypeDef(
       "Department",
-      ImmutableList.of[String],
+      ImmutableSet.of[String],
       TypesUtil.createRequiredAttrDef("name", DataTypes.STRING_TYPE),
       new AttributeDefinition("employees", String.format("array<%s>", "Person"),
         Multiplicity.COLLECTION, true, "department"))
     val personTypeDef: HierarchicalTypeDefinition[ClassType] = TypesUtil.createClassTypeDef(
-      "Person", ImmutableList.of[String],
+      "Person", ImmutableSet.of[String],
       TypesUtil.createRequiredAttrDef("name", DataTypes.STRING_TYPE),
       new AttributeDefinition("department", "Department", Multiplicity.REQUIRED, false, "employees"),
       new AttributeDefinition("manager", "Manager", Multiplicity.OPTIONAL, false, "subordinates"))
     val managerTypeDef: HierarchicalTypeDefinition[ClassType] = TypesUtil.createClassTypeDef(
-      "Manager", ImmutableList.of[String]("Person"),
+      "Manager", ImmutableSet.of[String]("Person"),
       new AttributeDefinition("subordinates", String.format("array<%s>", "Person"),
         Multiplicity.COLLECTION, false, "manager"))
     val securityClearanceTypeDef: HierarchicalTypeDefinition[TraitType] =
-      TypesUtil.createTraitTypeDef("SecurityClearance", ImmutableList.of[String],
+      TypesUtil.createTraitTypeDef("SecurityClearance", ImmutableSet.of[String],
         TypesUtil.createRequiredAttrDef("level", DataTypes.INT_TYPE))
 
     ts.defineTypes(ImmutableList.of[EnumTypeDefinition], ImmutableList.of[StructTypeDefinition],
@@ -240,4 +243,21 @@ class SerializationTest extends BaseTest {
 
   }
 
+  @Test def testIdSerde: Unit = {
+
+    val ts: TypeSystem = getTypeSystem
+    defineHRTypes(ts)
+    val hrDept: Referenceable = defineHRDept()
+    //default state is actiev by default
+    assertEquals(hrDept.getId.getState, EntityState.ACTIVE)
+
+    val deptType: ClassType = ts.getDataType(classOf[ClassType], "Department")
+    val hrDept2: ITypedReferenceableInstance = deptType.convert(hrDept, Multiplicity.REQUIRED)
+    hrDept2.getId.state = EntityState.DELETED
+
+    //updated state should be maintained correctly after serialisation-deserialisation
+    val deptJson: String = InstanceSerialization.toJson(hrDept2, true)
+    val deserDept: Referenceable = InstanceSerialization.fromJsonReferenceable(deptJson, true)
+    assertEquals(deserDept.getId.getState, EntityState.DELETED)
+  }
 }

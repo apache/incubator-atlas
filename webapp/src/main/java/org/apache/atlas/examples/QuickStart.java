@@ -18,8 +18,10 @@
 
 package org.apache.atlas.examples;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
 import org.apache.atlas.ApplicationProperties;
 import org.apache.atlas.AtlasClient;
 import org.apache.atlas.AtlasException;
@@ -38,9 +40,9 @@ import org.apache.atlas.typesystem.types.Multiplicity;
 import org.apache.atlas.typesystem.types.StructTypeDefinition;
 import org.apache.atlas.typesystem.types.TraitType;
 import org.apache.atlas.typesystem.types.utils.TypesUtil;
+import org.apache.atlas.utils.AuthenticationUtil;
 import org.apache.commons.configuration.Configuration;
 import org.codehaus.jettison.json.JSONArray;
-
 import java.util.List;
 
 /**
@@ -50,10 +52,43 @@ import java.util.List;
  */
 public class QuickStart {
     public static final String ATLAS_REST_ADDRESS = "atlas.rest.address";
+    public static final String SALES_DB = "Sales";
+    public static final String SALES_DB_DESCRIPTION = "Sales Database";
+    public static final String SALES_FACT_TABLE = "sales_fact";
+    public static final String FACT_TRAIT = "Fact";
+    public static final String COLUMNS_ATTRIBUTE = "columns";
+    public static final String TIME_ID_COLUMN = "time_id";
+    public static final String DB_ATTRIBUTE = "db";
+    public static final String SALES_FACT_TABLE_DESCRIPTION = "sales fact table";
+    public static final String LOAD_SALES_DAILY_PROCESS = "loadSalesDaily";
+    public static final String LOAD_SALES_DAILY_PROCESS_DESCRIPTION = "hive query for daily summary";
+    public static final String INPUTS_ATTRIBUTE = "inputs";
+    public static final String OUTPUTS_ATTRIBUTE = "outputs";
+    public static final String TIME_DIM_TABLE = "time_dim";
+    public static final String SALES_FACT_DAILY_MV_TABLE = "sales_fact_daily_mv";
+    public static final String PRODUCT_DIM_VIEW = "product_dim_view";
+    public static final String PRODUCT_DIM_TABLE = "product_dim";
+    public static final String INPUT_TABLES_ATTRIBUTE = "inputTables";
 
     public static void main(String[] args) throws Exception {
-        String baseUrl = getServerUrl(args);
-        QuickStart quickStart = new QuickStart(baseUrl);
+        String[] basicAuthUsernamePassword = null;
+        if (!AuthenticationUtil.isKerberosAuthenticationEnabled()) {
+            basicAuthUsernamePassword = AuthenticationUtil.getBasicAuthenticationInput();
+        }
+
+        runQuickstart(args, basicAuthUsernamePassword);
+    }
+
+    @VisibleForTesting
+    static void runQuickstart(String[] args, String[] basicAuthUsernamePassword) throws Exception {
+        String[] urls = getServerUrl(args);
+        QuickStart quickStart;
+
+        if (!AuthenticationUtil.isKerberosAuthenticationEnabled()) {
+            quickStart = new QuickStart(urls, basicAuthUsernamePassword);
+        } else {
+            quickStart = new QuickStart(urls);
+        }
 
         // Shows how to create types in Atlas for your meta model
         quickStart.createTypes();
@@ -65,37 +100,42 @@ public class QuickStart {
         quickStart.search();
     }
 
-    static String getServerUrl(String[] args) throws AtlasException {
+    static String[] getServerUrl(String[] args) throws AtlasException {
         if (args.length > 0) {
-            return args[0];
+            return args[0].split(",");
         }
 
         Configuration configuration = ApplicationProperties.get();
-        String baseUrl = configuration.getString(ATLAS_REST_ADDRESS);
-        if (baseUrl == null) {
+        String[] urls = configuration.getStringArray(ATLAS_REST_ADDRESS);
+        if (urls == null || urls.length == 0) {
             System.out.println("Usage: quick_start.py <atlas endpoint of format <http/https>://<atlas-fqdn>:<atlas port> like http://localhost:21000>");
             System.exit(-1);
         }
 
-        return baseUrl;
+        return urls;
     }
 
-    private static final String DATABASE_TYPE = "DB";
-    private static final String COLUMN_TYPE = "Column";
-    private static final String TABLE_TYPE = "Table";
-    private static final String VIEW_TYPE = "View";
-    private static final String LOAD_PROCESS_TYPE = "LoadProcess";
-    private static final String STORAGE_DESC_TYPE = "StorageDesc";
+    static final String DATABASE_TYPE = "DB";
+    static final String COLUMN_TYPE = "Column";
+    static final String TABLE_TYPE = "Table";
+    static final String VIEW_TYPE = "View";
+    static final String LOAD_PROCESS_TYPE = "LoadProcess";
+    static final String STORAGE_DESC_TYPE = "StorageDesc";
 
     private static final String[] TYPES =
             {DATABASE_TYPE, TABLE_TYPE, STORAGE_DESC_TYPE, COLUMN_TYPE, LOAD_PROCESS_TYPE, VIEW_TYPE, "JdbcAccess",
-                    "ETL", "Metric", "PII", "Fact", "Dimension"};
+                    "ETL", "Metric", "PII", "Fact", "Dimension", "Log Data"};
 
     private final AtlasClient metadataServiceClient;
 
-    QuickStart(String baseUrl) {
-        metadataServiceClient = new AtlasClient(baseUrl);
+    QuickStart(String[] urls,String[] basicAuthUsernamePassword) {
+        metadataServiceClient = new AtlasClient(urls,basicAuthUsernamePassword);
     }
+
+    QuickStart(String[] urls) throws AtlasException {
+        metadataServiceClient = new AtlasClient(urls);
+    }
+
 
     void createTypes() throws Exception {
         TypesDef typesDef = createTypeDefinitions();
@@ -110,33 +150,34 @@ public class QuickStart {
 
     TypesDef createTypeDefinitions() throws Exception {
         HierarchicalTypeDefinition<ClassType> dbClsDef = TypesUtil
-                .createClassTypeDef(DATABASE_TYPE, null, attrDef("name", DataTypes.STRING_TYPE),
+                .createClassTypeDef(DATABASE_TYPE, DATABASE_TYPE, null,
+                        TypesUtil.createUniqueRequiredAttrDef("name", DataTypes.STRING_TYPE),
                         attrDef("description", DataTypes.STRING_TYPE), attrDef("locationUri", DataTypes.STRING_TYPE),
                         attrDef("owner", DataTypes.STRING_TYPE), attrDef("createTime", DataTypes.LONG_TYPE));
 
         HierarchicalTypeDefinition<ClassType> storageDescClsDef = TypesUtil
-                .createClassTypeDef(STORAGE_DESC_TYPE, null, attrDef("location", DataTypes.STRING_TYPE),
+                .createClassTypeDef(STORAGE_DESC_TYPE, STORAGE_DESC_TYPE, null, attrDef("location", DataTypes.STRING_TYPE),
                         attrDef("inputFormat", DataTypes.STRING_TYPE), attrDef("outputFormat", DataTypes.STRING_TYPE),
                         attrDef("compressed", DataTypes.STRING_TYPE, Multiplicity.REQUIRED, false, null));
 
         HierarchicalTypeDefinition<ClassType> columnClsDef = TypesUtil
-                .createClassTypeDef(COLUMN_TYPE, null, attrDef("name", DataTypes.STRING_TYPE),
+                .createClassTypeDef(COLUMN_TYPE, COLUMN_TYPE, null, attrDef("name", DataTypes.STRING_TYPE),
                         attrDef("dataType", DataTypes.STRING_TYPE), attrDef("comment", DataTypes.STRING_TYPE));
 
         HierarchicalTypeDefinition<ClassType> tblClsDef = TypesUtil
-                .createClassTypeDef(TABLE_TYPE, ImmutableList.of("DataSet"),
-                        new AttributeDefinition("db", DATABASE_TYPE, Multiplicity.REQUIRED, false, null),
+                .createClassTypeDef(TABLE_TYPE, TABLE_TYPE, ImmutableSet.of("DataSet"),
+                        new AttributeDefinition(DB_ATTRIBUTE, DATABASE_TYPE, Multiplicity.REQUIRED, false, null),
                         new AttributeDefinition("sd", STORAGE_DESC_TYPE, Multiplicity.REQUIRED, true, null),
                         attrDef("owner", DataTypes.STRING_TYPE), attrDef("createTime", DataTypes.LONG_TYPE),
                         attrDef("lastAccessTime", DataTypes.LONG_TYPE), attrDef("retention", DataTypes.LONG_TYPE),
                         attrDef("viewOriginalText", DataTypes.STRING_TYPE),
                         attrDef("viewExpandedText", DataTypes.STRING_TYPE), attrDef("tableType", DataTypes.STRING_TYPE),
                         attrDef("temporary", DataTypes.BOOLEAN_TYPE),
-                        new AttributeDefinition("columns", DataTypes.arrayTypeName(COLUMN_TYPE),
+                        new AttributeDefinition(COLUMNS_ATTRIBUTE, DataTypes.arrayTypeName(COLUMN_TYPE),
                                 Multiplicity.COLLECTION, true, null));
 
         HierarchicalTypeDefinition<ClassType> loadProcessClsDef = TypesUtil
-                .createClassTypeDef(LOAD_PROCESS_TYPE, ImmutableList.of("Process"),
+                .createClassTypeDef(LOAD_PROCESS_TYPE, LOAD_PROCESS_TYPE, ImmutableSet.of("Process"),
                         attrDef("userName", DataTypes.STRING_TYPE), attrDef("startTime", DataTypes.LONG_TYPE),
                         attrDef("endTime", DataTypes.LONG_TYPE),
                         attrDef("queryText", DataTypes.STRING_TYPE, Multiplicity.REQUIRED),
@@ -145,25 +186,27 @@ public class QuickStart {
                         attrDef("queryGraph", DataTypes.STRING_TYPE, Multiplicity.REQUIRED));
 
         HierarchicalTypeDefinition<ClassType> viewClsDef = TypesUtil
-                .createClassTypeDef(VIEW_TYPE, null, attrDef("name", DataTypes.STRING_TYPE),
-                        new AttributeDefinition("db", DATABASE_TYPE, Multiplicity.REQUIRED, false, null),
-                        new AttributeDefinition("inputTables", DataTypes.arrayTypeName(TABLE_TYPE),
-                                Multiplicity.COLLECTION, false, null));
+            .createClassTypeDef(VIEW_TYPE, VIEW_TYPE, ImmutableSet.of("DataSet"),
+                new AttributeDefinition("db", DATABASE_TYPE, Multiplicity.REQUIRED, false, null),
+                new AttributeDefinition("inputTables", DataTypes.arrayTypeName(TABLE_TYPE),
+                    Multiplicity.COLLECTION, false, null));
 
-        HierarchicalTypeDefinition<TraitType> dimTraitDef = TypesUtil.createTraitTypeDef("Dimension", null);
+        HierarchicalTypeDefinition<TraitType> dimTraitDef = TypesUtil.createTraitTypeDef("Dimension",  "Dimension Trait", null);
 
-        HierarchicalTypeDefinition<TraitType> factTraitDef = TypesUtil.createTraitTypeDef("Fact", null);
+        HierarchicalTypeDefinition<TraitType> factTraitDef = TypesUtil.createTraitTypeDef("Fact", "Fact Trait", null);
 
-        HierarchicalTypeDefinition<TraitType> piiTraitDef = TypesUtil.createTraitTypeDef("PII", null);
+        HierarchicalTypeDefinition<TraitType> piiTraitDef = TypesUtil.createTraitTypeDef("PII", "PII Trait", null);
 
-        HierarchicalTypeDefinition<TraitType> metricTraitDef = TypesUtil.createTraitTypeDef("Metric", null);
+        HierarchicalTypeDefinition<TraitType> metricTraitDef = TypesUtil.createTraitTypeDef("Metric", "Metric Trait", null);
 
-        HierarchicalTypeDefinition<TraitType> etlTraitDef = TypesUtil.createTraitTypeDef("ETL", null);
+        HierarchicalTypeDefinition<TraitType> etlTraitDef = TypesUtil.createTraitTypeDef("ETL", "ETL Trait", null);
 
-        HierarchicalTypeDefinition<TraitType> jdbcTraitDef = TypesUtil.createTraitTypeDef("JdbcAccess", null);
+        HierarchicalTypeDefinition<TraitType> jdbcTraitDef = TypesUtil.createTraitTypeDef("JdbcAccess", "JdbcAccess Trait", null);
+
+        HierarchicalTypeDefinition<TraitType> logTraitDef = TypesUtil.createTraitTypeDef("Log Data", "LogData Trait",  null);
 
         return TypesUtil.getTypesDef(ImmutableList.<EnumTypeDefinition>of(), ImmutableList.<StructTypeDefinition>of(),
-                ImmutableList.of(dimTraitDef, factTraitDef, piiTraitDef, metricTraitDef, etlTraitDef, jdbcTraitDef),
+                ImmutableList.of(dimTraitDef, factTraitDef, piiTraitDef, metricTraitDef, etlTraitDef, jdbcTraitDef, logTraitDef),
                 ImmutableList.of(dbClsDef, storageDescClsDef, columnClsDef, tblClsDef, loadProcessClsDef, viewClsDef));
     }
 
@@ -183,7 +226,7 @@ public class QuickStart {
     }
 
     void createEntities() throws Exception {
-        Id salesDB = database("Sales", "Sales Database", "John ETL", "hdfs://host:8000/apps/warehouse/sales");
+        Id salesDB = database(SALES_DB, SALES_DB_DESCRIPTION, "John ETL", "hdfs://host:8000/apps/warehouse/sales");
 
 
         Referenceable sd =
@@ -191,25 +234,30 @@ public class QuickStart {
                         true);
 
         List<Referenceable> salesFactColumns = ImmutableList
-                .of(rawColumn("time_id", "int", "time id"), rawColumn("product_id", "int", "product id"),
+                .of(rawColumn(TIME_ID_COLUMN, "int", "time id"), rawColumn("product_id", "int", "product id"),
                         rawColumn("customer_id", "int", "customer id", "PII"),
                         rawColumn("sales", "double", "product id", "Metric"));
 
-        Id salesFact = table("sales_fact", "sales fact table", salesDB, sd, "Joe", "Managed", salesFactColumns, "Fact");
+        List<Referenceable> logFactColumns = ImmutableList
+                .of(rawColumn("time_id", "int", "time id"), rawColumn("app_id", "int", "app id"),
+                        rawColumn("machine_id", "int", "machine id"), rawColumn("log", "string", "log data", "Log Data"));
+
+        Id salesFact = table(SALES_FACT_TABLE, SALES_FACT_TABLE_DESCRIPTION, salesDB, sd, "Joe", "Managed",
+                salesFactColumns, FACT_TRAIT);
 
         List<Referenceable> productDimColumns = ImmutableList
                 .of(rawColumn("product_id", "int", "product id"), rawColumn("product_name", "string", "product name"),
                         rawColumn("brand_name", "int", "brand name"));
 
         Id productDim =
-                table("product_dim", "product dimension table", salesDB, sd, "John Doe", "Managed", productDimColumns,
-                        "Dimension");
+                table(PRODUCT_DIM_TABLE, "product dimension table", salesDB, sd, "John Doe", "Managed",
+                        productDimColumns, "Dimension");
 
         List<Referenceable> timeDimColumns = ImmutableList
                 .of(rawColumn("time_id", "int", "time id"), rawColumn("dayOfYear", "int", "day Of Year"),
                         rawColumn("weekDay", "int", "week Day"));
 
-        Id timeDim = table("time_dim", "time dimension table", salesDB, sd, "John Doe", "External", timeDimColumns,
+        Id timeDim = table(TIME_DIM_TABLE, "time dimension table", salesDB, sd, "John Doe", "External", timeDimColumns,
                 "Dimension");
 
 
@@ -225,14 +273,21 @@ public class QuickStart {
         Id reportingDB =
                 database("Reporting", "reporting database", "Jane BI", "hdfs://host:8000/apps/warehouse/reporting");
 
-        Id salesFactDaily =
-                table("sales_fact_daily_mv", "sales fact daily materialized view", reportingDB, sd, "Joe BI", "Managed",
-                        salesFactColumns, "Metric");
+        Id logDB = database("Logging", "logging database", "Tim ETL", "hdfs://host:8000/apps/warehouse/logging");
 
-        loadProcess("loadSalesDaily", "hive query for daily summary", "John ETL", ImmutableList.of(salesFact, timeDim),
+        Id salesFactDaily =
+                table(SALES_FACT_DAILY_MV_TABLE, "sales fact daily materialized view", reportingDB, sd, "Joe BI",
+                        "Managed", salesFactColumns, "Metric");
+
+        Id loggingFactDaily =
+                table("log_fact_daily_mv", "log fact daily materialized view", logDB, sd, "Tim ETL", "Managed",
+                        logFactColumns, "Log Data");
+
+        loadProcess(LOAD_SALES_DAILY_PROCESS, LOAD_SALES_DAILY_PROCESS_DESCRIPTION, "John ETL",
+                ImmutableList.of(salesFact, timeDim),
                 ImmutableList.of(salesFactDaily), "create table as select ", "plan", "id", "graph", "ETL");
 
-        view("product_dim_view", reportingDB, ImmutableList.of(productDim), "Dimension", "JdbcAccess");
+        view(PRODUCT_DIM_VIEW, reportingDB, ImmutableList.of(productDim), "Dimension", "JdbcAccess");
 
         view("customer_dim_view", reportingDB, ImmutableList.of(customerDim), "Dimension", "JdbcAccess");
 
@@ -242,6 +297,13 @@ public class QuickStart {
 
         loadProcess("loadSalesMonthly", "hive query for monthly summary", "John ETL", ImmutableList.of(salesFactDaily),
                 ImmutableList.of(salesFactMonthly), "create table as select ", "plan", "id", "graph", "ETL");
+
+        Id loggingFactMonthly =
+                table("logging_fact_monthly_mv", "logging fact monthly materialized view", logDB, sd, "Tim ETL",
+                        "Managed", logFactColumns, "Log Data");
+
+        loadProcess("loadLogsMonthly", "hive query for monthly summary", "Tim ETL", ImmutableList.of(loggingFactDaily),
+                ImmutableList.of(loggingFactMonthly), "create table as select ", "plan", "id", "graph", "ETL");
     }
 
     private Id createInstance(Referenceable referenceable) throws Exception {
@@ -249,11 +311,12 @@ public class QuickStart {
 
         String entityJSON = InstanceSerialization.toJson(referenceable, true);
         System.out.println("Submitting new entity= " + entityJSON);
-        JSONArray guids = metadataServiceClient.createEntity(entityJSON);
+        List<String> guids = metadataServiceClient.createEntity(entityJSON);
         System.out.println("created instance for type " + typeName + ", guid: " + guids);
 
         // return the Id for created instance with guid
-        return new Id(guids.getString(0), referenceable.getId().getVersion(), referenceable.getTypeName());
+        return new Id(guids.get(guids.size() - 1), referenceable.getId().getVersion(),
+                referenceable.getTypeName());
     }
 
     Id database(String name, String description, String owner, String locationUri, String... traitNames)
@@ -292,6 +355,7 @@ public class QuickStart {
             List<Referenceable> columns, String... traitNames) throws Exception {
         Referenceable referenceable = new Referenceable(TABLE_TYPE, traitNames);
         referenceable.set("name", name);
+        referenceable.set(AtlasClient.REFERENCEABLE_ATTRIBUTE_NAME, name);
         referenceable.set("description", description);
         referenceable.set("owner", owner);
         referenceable.set("tableType", tableType);
@@ -310,10 +374,11 @@ public class QuickStart {
     throws Exception {
         Referenceable referenceable = new Referenceable(LOAD_PROCESS_TYPE, traitNames);
         // super type attributes
-        referenceable.set("name", name);
+        referenceable.set(AtlasClient.NAME, name);
+        referenceable.set(AtlasClient.REFERENCEABLE_ATTRIBUTE_NAME, name);
         referenceable.set("description", description);
-        referenceable.set("inputs", inputTables);
-        referenceable.set("outputs", outputTables);
+        referenceable.set(INPUTS_ATTRIBUTE, inputTables);
+        referenceable.set(OUTPUTS_ATTRIBUTE, outputTables);
 
         referenceable.set("user", user);
         referenceable.set("startTime", System.currentTimeMillis());
@@ -330,9 +395,10 @@ public class QuickStart {
     Id view(String name, Id dbId, List<Id> inputTables, String... traitNames) throws Exception {
         Referenceable referenceable = new Referenceable(VIEW_TYPE, traitNames);
         referenceable.set("name", name);
+        referenceable.set(AtlasClient.REFERENCEABLE_ATTRIBUTE_NAME, name);
         referenceable.set("db", dbId);
 
-        referenceable.set("inputTables", inputTables);
+        referenceable.set(INPUT_TABLES_ATTRIBUTE, inputTables);
 
         return createInstance(referenceable);
     }
@@ -377,7 +443,7 @@ public class QuickStart {
                 // trait searches
                 "Dimension",
             /*"Fact", - todo: does not work*/
-                "JdbcAccess", "ETL", "Metric", "PII",
+                "JdbcAccess", "ETL", "Metric", "PII", "`Log Data`",
             /*
             // Lineage - todo - fix this, its not working
             "Table hive_process outputTables",
@@ -394,11 +460,11 @@ public class QuickStart {
 
     private void search() throws Exception {
         for (String dslQuery : getDSLQueries()) {
-            JSONArray results = metadataServiceClient.search(dslQuery);
+            JSONArray results = metadataServiceClient.search(dslQuery, 10, 0);
             if (results != null) {
                 System.out.println("query [" + dslQuery + "] returned [" + results.length() + "] rows");
             } else {
-                System.out.println("query [" + dslQuery + "] failed, results:" + results.toString());
+                System.out.println("query [" + dslQuery + "] failed, results:" + results);
             }
         }
     }

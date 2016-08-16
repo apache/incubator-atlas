@@ -140,9 +140,12 @@ public class DefaultGraphPersistenceStrategy implements GraphPersistenceStrategi
                 TypeSystem.IdType idType = TypeSystem.getInstance().getIdType();
 
                 if (dataType.getName().equals(idType.getName())) {
-                    structInstance.set(idType.typeNameAttrName(), structVertex.getProperty(typeAttributeName()));
-                    structInstance.set(idType.idAttrName(), structVertex.getProperty(idAttributeName()));
-
+                    structInstance.set(idType.typeNameAttrName(), GraphHelper.getProperty(structVertex, typeAttributeName()));
+                    structInstance.set(idType.idAttrName(), GraphHelper.getProperty(structVertex, idAttributeName()));
+                    String stateValue = GraphHelper.getProperty(structVertex, stateAttributeName());
+                    if (stateValue != null) {
+                        structInstance.set(idType.stateAttrName(), stateValue);
+                    }
                 } else {
                     metadataRepository.getGraphToInstanceMapper()
                         .mapVertexToInstance(structVertex, structInstance, structType.fieldMapping().fields);
@@ -226,6 +229,11 @@ public class DefaultGraphPersistenceStrategy implements GraphPersistenceStrategi
     @Override
     public String idAttributeName() {
         return metadataRepository.getIdAttributeName();
+    }
+
+    @Override
+    public String stateAttributeName() {
+        return metadataRepository.getStateAttributeName();
     }
 
     @Override

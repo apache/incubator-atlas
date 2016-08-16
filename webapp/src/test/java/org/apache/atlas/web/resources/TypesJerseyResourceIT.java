@@ -19,9 +19,11 @@
 package org.apache.atlas.web.resources;
 
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
 import com.sun.jersey.api.client.ClientResponse;
 import com.sun.jersey.api.client.WebResource;
 import org.apache.atlas.AtlasClient;
+import org.apache.atlas.AtlasServiceException;
 import org.apache.atlas.typesystem.TypesDef;
 import org.apache.atlas.typesystem.json.TypesSerialization;
 import org.apache.atlas.typesystem.json.TypesSerialization$;
@@ -45,7 +47,12 @@ import org.testng.annotations.Test;
 import javax.ws.rs.HttpMethod;
 import javax.ws.rs.core.Response;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
+
+import static org.apache.atlas.typesystem.types.utils.TypesUtil.createOptionalAttrDef;
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.fail;
 
 /**
  * Integration test for types jersey resource.
@@ -76,44 +83,60 @@ public class TypesJerseyResourceIT extends BaseResourceIT {
 
             ClientResponse clientResponse = resource.accept(Servlets.JSON_MEDIA_TYPE).type(Servlets.JSON_MEDIA_TYPE)
                     .method(HttpMethod.POST, ClientResponse.class, typesAsJSON);
-            Assert.assertEquals(clientResponse.getStatus(), Response.Status.CREATED.getStatusCode());
+            assertEquals(clientResponse.getStatus(), Response.Status.CREATED.getStatusCode());
 
             String responseAsString = clientResponse.getEntity(String.class);
             Assert.assertNotNull(responseAsString);
 
             JSONObject response = new JSONObject(responseAsString);
             JSONArray typesAdded = response.getJSONArray(AtlasClient.TYPES);
-            Assert.assertEquals(typesAdded.length(), 1);
-            Assert.assertEquals(typesAdded.getJSONObject(0).getString("name"), typeDefinition.typeName);
+            assertEquals(typesAdded.length(), 1);
+            assertEquals(typesAdded.getJSONObject(0).getString("name"), typeDefinition.typeName);
             Assert.assertNotNull(response.get(AtlasClient.REQUEST_ID));
+        }
+    }
+
+    @Test
+    public void testDuplicateSubmit() throws Exception {
+        HierarchicalTypeDefinition<ClassType> type = TypesUtil.createClassTypeDef(randomString(),
+                ImmutableSet.<String>of(), TypesUtil.createUniqueRequiredAttrDef("name", DataTypes.STRING_TYPE));
+        TypesDef typesDef =
+                TypesUtil.getTypesDef(ImmutableList.<EnumTypeDefinition>of(), ImmutableList.<StructTypeDefinition>of(),
+                        ImmutableList.<HierarchicalTypeDefinition<TraitType>>of(), ImmutableList.of(type));
+        serviceClient.createType(typesDef);
+
+        try {
+            serviceClient.createType(typesDef);
+            fail("Expected 409");
+        } catch (AtlasServiceException e) {
+            assertEquals(e.getStatus().getStatusCode(), Response.Status.CONFLICT.getStatusCode());
         }
     }
 
     @Test
     public void testUpdate() throws Exception {
         HierarchicalTypeDefinition<ClassType> typeDefinition = TypesUtil
-                .createClassTypeDef(randomString(), ImmutableList.<String>of(),
+                .createClassTypeDef(randomString(), ImmutableSet.<String>of(),
                         TypesUtil.createUniqueRequiredAttrDef("name", DataTypes.STRING_TYPE));
         List<String> typesCreated = serviceClient.createType(TypesSerialization.toJson(typeDefinition, false));
-        Assert.assertEquals(typesCreated.size(), 1);
-        Assert.assertEquals(typesCreated.get(0), typeDefinition.typeName);
+        assertEquals(typesCreated.size(), 1);
+        assertEquals(typesCreated.get(0), typeDefinition.typeName);
 
-        //Add super type
-        HierarchicalTypeDefinition<ClassType> superTypeDefinition = TypesUtil
-                .createClassTypeDef(randomString(), ImmutableList.<String>of(),
-                        TypesUtil.createOptionalAttrDef("sname", DataTypes.STRING_TYPE));
-
+        //Add attribute description
         typeDefinition = TypesUtil.createClassTypeDef(typeDefinition.typeName,
-                ImmutableList.of(superTypeDefinition.typeName),
+            ImmutableSet.<String>of(),
                 TypesUtil.createUniqueRequiredAttrDef("name", DataTypes.STRING_TYPE),
-                TypesUtil.createOptionalAttrDef("description", DataTypes.STRING_TYPE));
+                createOptionalAttrDef("description", DataTypes.STRING_TYPE));
         TypesDef typeDef = TypesUtil.getTypesDef(ImmutableList.<EnumTypeDefinition>of(),
                 ImmutableList.<StructTypeDefinition>of(), ImmutableList.<HierarchicalTypeDefinition<TraitType>>of(),
-                ImmutableList.of(superTypeDefinition, typeDefinition));
+                ImmutableList.of(typeDefinition));
         List<String> typesUpdated = serviceClient.updateType(typeDef);
-        Assert.assertEquals(typesUpdated.size(), 2);
-        Assert.assertTrue(typesUpdated.contains(superTypeDefinition.typeName));
+        assertEquals(typesUpdated.size(), 1);
         Assert.assertTrue(typesUpdated.contains(typeDefinition.typeName));
+
+        HierarchicalTypeDefinition<ClassType>
+                updatedType = serviceClient.getType(typeDefinition.typeName).classTypesAsJavaList().get(0);
+        assertEquals(updatedType.attributeDefinitions.length, 2);
     }
 
     @Test(dependsOnMethods = "testSubmit")
@@ -125,7 +148,7 @@ public class TypesJerseyResourceIT extends BaseResourceIT {
 
             ClientResponse clientResponse = resource.accept(Servlets.JSON_MEDIA_TYPE).type(Servlets.JSON_MEDIA_TYPE)
                     .method(HttpMethod.GET, ClientResponse.class);
-            Assert.assertEquals(clientResponse.getStatus(), Response.Status.OK.getStatusCode());
+            assertEquals(clientResponse.getStatus(), Response.Status.OK.getStatusCode());
 
             String responseAsString = clientResponse.getEntity(String.class);
             Assert.assertNotNull(responseAsString);
@@ -139,8 +162,8 @@ public class TypesJerseyResourceIT extends BaseResourceIT {
             for (HierarchicalTypeDefinition<ClassType> classType : hierarchicalTypeDefinitions) {
                 for (AttributeDefinition attrDef : classType.attributeDefinitions) {
                     if ("name".equals(attrDef.name)) {
-                        Assert.assertEquals(attrDef.isIndexable, true);
-                        Assert.assertEquals(attrDef.isUnique, true);
+                        assertEquals(attrDef.isIndexable, true);
+                        assertEquals(attrDef.isUnique, true);
                     }
                 }
             }
@@ -153,7 +176,7 @@ public class TypesJerseyResourceIT extends BaseResourceIT {
 
         ClientResponse clientResponse = resource.accept(Servlets.JSON_MEDIA_TYPE).type(Servlets.JSON_MEDIA_TYPE)
                 .method(HttpMethod.GET, ClientResponse.class);
-        Assert.assertEquals(clientResponse.getStatus(), Response.Status.NOT_FOUND.getStatusCode());
+        assertEquals(clientResponse.getStatus(), Response.Status.NOT_FOUND.getStatusCode());
     }
 
     @Test(dependsOnMethods = "testSubmit")
@@ -162,7 +185,7 @@ public class TypesJerseyResourceIT extends BaseResourceIT {
 
         ClientResponse clientResponse = resource.accept(Servlets.JSON_MEDIA_TYPE).type(Servlets.JSON_MEDIA_TYPE)
                 .method(HttpMethod.GET, ClientResponse.class);
-        Assert.assertEquals(clientResponse.getStatus(), Response.Status.OK.getStatusCode());
+        assertEquals(clientResponse.getStatus(), Response.Status.OK.getStatusCode());
 
         String responseAsString = clientResponse.getEntity(String.class);
         Assert.assertNotNull(responseAsString);
@@ -188,7 +211,7 @@ public class TypesJerseyResourceIT extends BaseResourceIT {
         ClientResponse clientResponse =
                 resource.queryParam("type", DataTypes.TypeCategory.TRAIT.name()).accept(Servlets.JSON_MEDIA_TYPE)
                         .type(Servlets.JSON_MEDIA_TYPE).method(HttpMethod.GET, ClientResponse.class);
-        Assert.assertEquals(clientResponse.getStatus(), Response.Status.OK.getStatusCode());
+        assertEquals(clientResponse.getStatus(), Response.Status.OK.getStatusCode());
 
         String responseAsString = clientResponse.getEntity(String.class);
         Assert.assertNotNull(responseAsString);
@@ -201,12 +224,28 @@ public class TypesJerseyResourceIT extends BaseResourceIT {
         Assert.assertTrue(list.length() >= traitsAdded.length);
     }
 
+    @Test
+    public void testListTypesByFilter() throws Exception {
+        AttributeDefinition attr = TypesUtil.createOptionalAttrDef("attr", DataTypes.STRING_TYPE);
+        String a = createType(TypesSerialization.toJson(
+                TypesUtil.createClassTypeDef("A" + randomString(), ImmutableSet.<String>of(), attr), false)).get(0);
+        String a1 = createType(TypesSerialization.toJson(
+                TypesUtil.createClassTypeDef("A1" + randomString(), ImmutableSet.of(a), attr), false)).get(0);
+        String b = createType(TypesSerialization.toJson(
+                TypesUtil.createClassTypeDef("B" + randomString(), ImmutableSet.<String>of(), attr), false)).get(0);
+        String c = createType(TypesSerialization.toJson(
+                TypesUtil.createClassTypeDef("C" + randomString(), ImmutableSet.of(a, b), attr), false)).get(0);
+
+        List<String> results = serviceClient.listTypes(DataTypes.TypeCategory.CLASS, a, b);
+        assertEquals(results, Arrays.asList(a1), "Results: " + results);
+    }
+
     private String[] addTraits() throws Exception {
         String[] traitNames = {"class_trait", "secure_trait", "pii_trait", "ssn_trait", "salary_trait", "sox_trait",};
 
         for (String traitName : traitNames) {
             HierarchicalTypeDefinition<TraitType> traitTypeDef =
-                    TypesUtil.createTraitTypeDef(traitName, ImmutableList.<String>of());
+                    TypesUtil.createTraitTypeDef(traitName, ImmutableSet.<String>of());
             String json = TypesSerialization$.MODULE$.toJson(traitTypeDef, true);
             createType(json);
         }
@@ -218,25 +257,25 @@ public class TypesJerseyResourceIT extends BaseResourceIT {
         ArrayList<HierarchicalTypeDefinition> typeDefinitions = new ArrayList<>();
 
         HierarchicalTypeDefinition<ClassType> databaseTypeDefinition = TypesUtil
-                .createClassTypeDef("database", ImmutableList.<String>of(),
+                .createClassTypeDef("database", ImmutableSet.<String>of(),
                         TypesUtil.createUniqueRequiredAttrDef("name", DataTypes.STRING_TYPE),
                         TypesUtil.createRequiredAttrDef("description", DataTypes.STRING_TYPE));
         typeDefinitions.add(databaseTypeDefinition);
 
         HierarchicalTypeDefinition<ClassType> tableTypeDefinition = TypesUtil
-                .createClassTypeDef("table", ImmutableList.<String>of(),
+                .createClassTypeDef("table", ImmutableSet.<String>of(),
                         TypesUtil.createUniqueRequiredAttrDef("name", DataTypes.STRING_TYPE),
                         TypesUtil.createRequiredAttrDef("description", DataTypes.STRING_TYPE),
-                        TypesUtil.createOptionalAttrDef("columnNames", DataTypes.arrayTypeName(DataTypes.STRING_TYPE)),
-                        TypesUtil.createOptionalAttrDef("created", DataTypes.DATE_TYPE), TypesUtil
-                                .createOptionalAttrDef("parameters",
+                        createOptionalAttrDef("columnNames", DataTypes.arrayTypeName(DataTypes.STRING_TYPE)),
+                        createOptionalAttrDef("created", DataTypes.DATE_TYPE),
+                        createOptionalAttrDef("parameters",
                                         DataTypes.mapTypeName(DataTypes.STRING_TYPE, DataTypes.STRING_TYPE)),
                         TypesUtil.createRequiredAttrDef("type", DataTypes.STRING_TYPE),
                         new AttributeDefinition("database", "database", Multiplicity.REQUIRED, false, "database"));
         typeDefinitions.add(tableTypeDefinition);
 
         HierarchicalTypeDefinition<TraitType> fetlTypeDefinition = TypesUtil
-                .createTraitTypeDef("fetl", ImmutableList.<String>of(),
+                .createTraitTypeDef("fetl", ImmutableSet.<String>of(),
                         TypesUtil.createRequiredAttrDef("level", DataTypes.INT_TYPE));
         typeDefinitions.add(fetlTypeDefinition);
 

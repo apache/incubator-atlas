@@ -17,6 +17,21 @@
 
 <configuration>
     <property>
+        <name>hive.exec.submit.local.task.via.child</name>
+        <value>false</value>
+    </property>
+
+    <property>
+        <name>mapreduce.framework.name</name>
+        <value>local</value>
+    </property>
+
+    <property>
+        <name>fs.default.name</name>
+        <value>file:///</value>
+    </property>
+
+    <property>
         <name>hive.exec.post.hooks</name>
         <value>org.apache.atlas.hive.hook.HiveHook</value>
     </property>
@@ -42,12 +57,17 @@
     </property>
 
     <property>
-        <name>atlas.cluster.name</name>
-        <value>test</value>
+        <name>fs.pfile.impl</name>
+        <value>org.apache.hadoop.fs.ProxyLocalFileSystem</value>
     </property>
 
     <property>
-        <name>fs.pfile.impl</name>
-        <value>org.apache.hadoop.fs.ProxyLocalFileSystem</value>
+        <name>hive.in.test</name>
+        <value>true</value>
+    </property>
+
+    <property>
+        <name>hive.zookeeper.quorum</name>
+        <value>localhost:19026</value>
     </property>
 </configuration>

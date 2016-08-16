@@ -18,10 +18,12 @@
 
 package org.apache.atlas.discovery.graph;
 
+import com.thinkaurelius.titan.core.TitanEdge;
 import com.thinkaurelius.titan.core.TitanGraph;
 import com.thinkaurelius.titan.core.TitanIndexQuery;
 import com.thinkaurelius.titan.core.TitanProperty;
 import com.thinkaurelius.titan.core.TitanVertex;
+import com.tinkerpop.blueprints.Direction;
 import com.tinkerpop.blueprints.Vertex;
 import org.apache.atlas.AtlasClient;
 import org.apache.atlas.GraphTransaction;
@@ -32,10 +34,12 @@ import org.apache.atlas.query.GremlinEvaluator;
 import org.apache.atlas.query.GremlinQuery;
 import org.apache.atlas.query.GremlinQueryResult;
 import org.apache.atlas.query.GremlinTranslator;
+import org.apache.atlas.query.QueryParams;
 import org.apache.atlas.query.QueryParser;
 import org.apache.atlas.query.QueryProcessor;
 import org.apache.atlas.repository.Constants;
 import org.apache.atlas.repository.MetadataRepository;
+import org.apache.atlas.repository.graph.GraphHelper;
 import org.apache.atlas.repository.graph.GraphProvider;
 import org.codehaus.jettison.json.JSONArray;
 import org.codehaus.jettison.json.JSONException;
@@ -56,6 +60,7 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Graph backed implementation of Search.
@@ -82,23 +87,29 @@ public class GraphBackedDiscoveryService implements DiscoveryService {
     // .html#query-string-syntax for query syntax
     @Override
     @GraphTransaction
-    public String searchByFullText(String query) throws DiscoveryException {
-        String graphQuery = String.format("v.%s:(%s)", Constants.ENTITY_TEXT_PROPERTY_KEY, query);
+    public String searchByFullText(String query, QueryParams queryParams) throws DiscoveryException {
+        String graphQuery = String.format("v.\"%s\":(%s)", Constants.ENTITY_TEXT_PROPERTY_KEY, query);
         LOG.debug("Full text query: {}", graphQuery);
         Iterator<TitanIndexQuery.Result<Vertex>> results =
                 titanGraph.indexQuery(Constants.FULLTEXT_INDEX, graphQuery).vertices().iterator();
         JSONArray response = new JSONArray();
 
-        while (results.hasNext()) {
+        int index = 0;
+        while (results.hasNext() && index < queryParams.offset()) {
+            results.next();
+            index++;
+        }
+
+        while (results.hasNext() && response.length() < queryParams.limit()) {
             TitanIndexQuery.Result<Vertex> result = results.next();
             Vertex vertex = result.getElement();
 
             JSONObject row = new JSONObject();
-            String guid = vertex.getProperty(Constants.GUID_PROPERTY_KEY);
+            String guid = GraphHelper.getIdFromVertex(vertex);
             if (guid != null) { //Filter non-class entities
                 try {
                     row.put("guid", guid);
-                    row.put(AtlasClient.TYPENAME, vertex.<String>getProperty(Constants.ENTITY_TYPE_PROPERTY_KEY));
+                    row.put(AtlasClient.TYPENAME, GraphHelper.getTypeName(vertex));
                     row.put(SCORE, result.getScore());
                 } catch (JSONException e) {
                     LOG.error("Unable to create response", e);
@@ -111,28 +122,20 @@ public class GraphBackedDiscoveryService implements DiscoveryService {
         return response.toString();
     }
 
-    /**
-     * Search using query DSL.
-     *
-     * @param dslQuery query in DSL format.
-     * @return JSON representing the type and results.
-     */
     @Override
     @GraphTransaction
-    public String searchByDSL(String dslQuery) throws DiscoveryException {
-        LOG.info("Executing dsl query={}", dslQuery);
-        GremlinQueryResult queryResult = evaluate(dslQuery);
+    public String searchByDSL(String dslQuery, QueryParams queryParams) throws DiscoveryException {
+        GremlinQueryResult queryResult = evaluate(dslQuery, queryParams);
         return queryResult.toJson();
     }
 
-    public GremlinQueryResult evaluate(String dslQuery) throws DiscoveryException {
-        LOG.info("Executing dsl query={}", dslQuery);
+    public GremlinQueryResult evaluate(String dslQuery, QueryParams queryParams) throws DiscoveryException {
+        LOG.debug("Executing dsl query={}", dslQuery);
         try {
-            QueryParser queryParser = new QueryParser();
-            Either<Parsers.NoSuccess, Expressions.Expression> either = queryParser.apply(dslQuery);
+            Either<Parsers.NoSuccess, Expressions.Expression> either = QueryParser.apply(dslQuery, queryParams);
             if (either.isRight()) {
                 Expressions.Expression expression = either.right().get();
-                return evaluate(expression);
+                return evaluate(dslQuery, expression);
             } else {
                 throw new DiscoveryException("Invalid expression : " + dslQuery + ". " + either.left());
             }
@@ -141,8 +144,16 @@ public class GraphBackedDiscoveryService implements DiscoveryService {
         }
     }
 
-    public GremlinQueryResult evaluate(Expressions.Expression expression) {
+    private GremlinQueryResult evaluate(String dslQuery, Expressions.Expression expression) {
         Expressions.Expression validatedExpression = QueryProcessor.validate(expression);
+
+        //If the final limit is 0, don't launch the query, return with 0 rows
+        if (validatedExpression instanceof Expressions.LimitExpression
+                && ((Integer)((Expressions.LimitExpression) validatedExpression).limit().rawValue()) == 0) {
+            return new GremlinQueryResult(dslQuery, validatedExpression.dataType(),
+                    scala.collection.immutable.List.empty());
+        }
+
         GremlinQuery gremlinQuery = new GremlinTranslator(validatedExpression, graphPersistenceStrategy).translate();
         LOG.debug("Query = {}", validatedExpression);
         LOG.debug("Expression Tree = {}", validatedExpression.treeString());
@@ -162,9 +173,14 @@ public class GraphBackedDiscoveryService implements DiscoveryService {
     @Override
     @GraphTransaction
     public List<Map<String, String>> searchByGremlin(String gremlinQuery) throws DiscoveryException {
-        LOG.info("Executing gremlin query={}", gremlinQuery);
+        LOG.debug("Executing gremlin query={}", gremlinQuery);
         ScriptEngineManager manager = new ScriptEngineManager();
         ScriptEngine engine = manager.getEngineByName("gremlin-groovy");
+
+        if(engine == null) {
+            throw new DiscoveryException("gremlin-groovy: engine not found");
+        }
+
         Bindings bindings = engine.createBindings();
         bindings.put("g", titanGraph);
 
@@ -176,40 +192,54 @@ public class GraphBackedDiscoveryService implements DiscoveryService {
         }
     }
 
-    private List<Map<String, String>> extractResult(Object o) throws DiscoveryException {
-        if (!(o instanceof List)) {
-            throw new DiscoveryException(String.format("Cannot process result %s", o.toString()));
-        }
-
-        List l = (List) o;
+    private List<Map<String, String>> extractResult(final Object o) throws DiscoveryException {
         List<Map<String, String>> result = new ArrayList<>();
-        for (Object r : l) {
+        if (o instanceof List) {
+            List l = (List) o;
+            for (Object r : l) {
 
-            Map<String, String> oRow = new HashMap<>();
-            if (r instanceof Map) {
-                @SuppressWarnings("unchecked") Map<Object, Object> iRow = (Map) r;
-                for (Map.Entry e : iRow.entrySet()) {
-                    Object k = e.getKey();
-                    Object v = e.getValue();
-                    oRow.put(k.toString(), v.toString());
-                }
-            } else if (r instanceof TitanVertex) {
-                Iterable<TitanProperty> ps = ((TitanVertex) r).getProperties();
-                for (TitanProperty tP : ps) {
-                    String pName = tP.getPropertyKey().getName();
-                    Object pValue = ((TitanVertex) r).getProperty(pName);
-                    if (pValue != null) {
-                        oRow.put(pName, pValue.toString());
+                Map<String, String> oRow = new HashMap<>();
+                if (r instanceof Map) {
+                    @SuppressWarnings("unchecked") Map<Object, Object> iRow = (Map) r;
+                    for (Map.Entry e : iRow.entrySet()) {
+                        Object k = e.getKey();
+                        Object v = e.getValue();
+                        oRow.put(k.toString(), v.toString());
                     }
+                } else if (r instanceof TitanVertex) {
+                    TitanVertex vertex = (TitanVertex) r;
+                    oRow.put("id", vertex.getId().toString());
+                    Iterable<TitanProperty> ps = vertex.getProperties();
+                    for (TitanProperty tP : ps) {
+                        String pName = tP.getPropertyKey().getName();
+                        Object pValue = vertex.getProperty(pName);
+                        if (pValue != null) {
+                            oRow.put(pName, pValue.toString());
+                        }
+                    }
+
+                } else if (r instanceof String) {
+                    oRow.put("", r.toString());
+                } else if (r instanceof TitanEdge) {
+                    TitanEdge edge = (TitanEdge) r;
+                    oRow.put("id", edge.getId().toString());
+                    oRow.put("label", edge.getLabel());
+                    oRow.put("inVertex", edge.getVertex(Direction.IN).getId().toString());
+                    oRow.put("outVertex", edge.getVertex(Direction.OUT).getId().toString());
+                    Set<String> propertyKeys = edge.getPropertyKeys();
+                    for (String propertyKey : propertyKeys) {
+                        oRow.put(propertyKey, edge.getProperty(propertyKey).toString());
+                    }
+                } else {
+                    throw new DiscoveryException(String.format("Cannot process result %s", o.toString()));
                 }
 
-            } else if (r instanceof String) {
-                oRow.put("", r.toString());
-            } else {
-                throw new DiscoveryException(String.format("Cannot process result %s", o.toString()));
+                result.add(oRow);
             }
-
-            result.add(oRow);
+        } else {
+            result.add(new HashMap<String, String>() {{
+                put("result", o.toString());
+            }});
         }
         return result;
     }

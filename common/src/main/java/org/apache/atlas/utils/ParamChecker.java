@@ -1,10 +1,11 @@
-/*
- * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with
- * this work for additional information regarding copyright ownership.
- * The ASF licenses this file to You under the Apache License, Version 2.0
- * (the "License"); you may not use this file except in compliance with
- * the License.  You may obtain a copy of the License at
+/**
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
  *
  *     http://www.apache.org/licenses/LICENSE-2.0
  *
@@ -14,13 +15,18 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package org.apache.atlas.utils;
 
 import java.util.Arrays;
 import java.util.Collection;
 
-public class ParamChecker {
+/**
+ * Utilities for checking parameters.
+ */
+public final class ParamChecker {
+
+    private ParamChecker() {
+    }
 
     /**
      * Check that a value is not null. If null throws an IllegalArgumentException.
@@ -133,16 +139,23 @@ public class ParamChecker {
     }
 
     /**
-     * Check that a list is not null and that none of its elements is null. If null or if the list has emtpy elements
-     * throws an IllegalArgumentException.
-     *  @param list the list of strings.
-     * @param name parameter name for the exception message.
+     * Checks that the given value is <= max value.
+     * @param value
+     * @param maxValue
+     * @param name
      */
-    public static Collection<String> notEmptyElements(Collection<String> list, String name) {
-        notEmpty(list, name);
-        for (String ele : list) {
-            notEmpty(ele, String.format("list %s element %s", name, ele));
+    public static void lessThan(long value, long maxValue, String name) {
+        if (value <= 0) {
+            throw new IllegalArgumentException(name + " should be > 0, current value " + value);
         }
-        return list;
+        if (value > maxValue) {
+            throw new IllegalArgumentException(name + " should be <= " + maxValue + ", current value " + value);
+        }
+    }
+
+    public static void greaterThan(long value, long minValue, String name) {
+        if (value <= minValue) {
+            throw new IllegalArgumentException(name + " should be > " + minValue + ", current value " + value);
+        }
     }
 }

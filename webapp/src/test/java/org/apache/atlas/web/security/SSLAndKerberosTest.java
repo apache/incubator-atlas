@@ -18,6 +18,7 @@
 
 package org.apache.atlas.web.security;
 
+import org.apache.atlas.ApplicationProperties;
 import org.apache.atlas.AtlasClient;
 import org.apache.atlas.AtlasException;
 import org.apache.atlas.web.TestUtils;
@@ -68,25 +69,43 @@ public class SSLAndKerberosTest extends BaseSSLAndKerberosTest {
 
         // client will actually only leverage subset of these properties
         final PropertiesConfiguration configuration = getSSLConfiguration(providerUrl);
-        configuration.setProperty("atlas.http.authentication.type", "kerberos");
-        TestUtils.writeConfiguration(configuration, persistDir + File.separator + "client.properties");
+
+        persistSSLClientConfiguration((org.apache.commons.configuration.Configuration) configuration);
+
+        TestUtils.writeConfiguration(configuration, persistDir + File.separator +
+            ApplicationProperties.APPLICATION_PROPERTIES);
 
         String confLocation = System.getProperty("atlas.conf");
         URL url;
         if (confLocation == null) {
-            url = SSLAndKerberosTest.class.getResource("/application.properties");
+            url = SSLAndKerberosTest.class.getResource("/" + ApplicationProperties.APPLICATION_PROPERTIES);
         } else {
-            url = new File(confLocation, "application.properties").toURI().toURL();
+            url = new File(confLocation, ApplicationProperties.APPLICATION_PROPERTIES).toURI().toURL();
         }
         configuration.load(url);
         configuration.setProperty(TLS_ENABLED, true);
-        configuration.setProperty("atlas.http.authentication.enabled", "true");
-        configuration.setProperty("atlas.http.authentication.kerberos.principal", "HTTP/localhost@" + kdc.getRealm());
-        configuration.setProperty("atlas.http.authentication.kerberos.keytab", httpKeytabFile.getAbsolutePath());
-        configuration.setProperty("atlas.http.authentication.kerberos.name.rules",
+        configuration.setProperty("atlas.authentication.method.kerberos", "true");
+        configuration.setProperty("atlas.authentication.keytab",userKeytabFile.getAbsolutePath());
+        configuration.setProperty("atlas.authentication.principal","dgi/localhost@"+kdc.getRealm());
+
+        configuration.setProperty("atlas.authentication.method.file", "false");
+        configuration.setProperty("atlas.authentication.method.kerberos", "true");
+        configuration.setProperty("atlas.authentication.method.kerberos.principal", "HTTP/localhost@" + kdc.getRealm());
+        configuration.setProperty("atlas.authentication.method.kerberos.keytab", httpKeytabFile.getAbsolutePath());
+        configuration.setProperty("atlas.authentication.method.kerberos.name.rules",
                 "RULE:[1:$1@$0](.*@EXAMPLE.COM)s/@.*//\nDEFAULT");
 
-        TestUtils.writeConfiguration(configuration, persistDir + File.separator + "application.properties");
+        configuration.setProperty("atlas.authentication.method.file", "true");
+        configuration.setProperty("atlas.authentication.method.file.filename", persistDir
+                + "/users-credentials");
+        configuration.setProperty("atlas.auth.policy.file",persistDir
+                + "/policy-store.txt" );
+
+        TestUtils.writeConfiguration(configuration, persistDir + File.separator +
+          "atlas-application.properties");
+
+        setupUserCredential(persistDir);
+        setUpPolicyStore(persistDir);
 
         subject = loginTestUser();
         UserGroupInformation.loginUserFromSubject(subject);
@@ -94,21 +113,23 @@ public class SSLAndKerberosTest extends BaseSSLAndKerberosTest {
             "testUser",
             UserGroupInformation.getLoginUser());
 
+        // save original setting
+        originalConf = System.getProperty("atlas.conf");
+        System.setProperty("atlas.conf", persistDir);
+
         dgiCLient = proxyUser.doAs(new PrivilegedExceptionAction<AtlasClient>() {
             @Override
             public AtlasClient run() throws Exception {
                 return new AtlasClient(DGI_URL) {
                     @Override
-                    protected PropertiesConfiguration getClientProperties() throws AtlasException {
+                    protected PropertiesConfiguration getClientProperties() {
                         return configuration;
                     }
                 };
             }
         });
 
-        // save original setting
-        originalConf = System.getProperty("atlas.conf");
-        System.setProperty("atlas.conf", persistDir);
+
         secureEmbeddedServer = new TestSecureEmbeddedServer(21443, getWarPath()) {
             @Override
             public PropertiesConfiguration getConfiguration() {

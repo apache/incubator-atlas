@@ -1,0 +1,240 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+
+/* override.scss */
+
+.tabs li.tab.active {
+    border-bottom: 2px solid $color_keppel_approx;
+    a {
+        color: $color_keppel_approx;
+    }
+}
+
+.modal-header {
+    padding: 15px;
+    border-bottom: 1px solid #DEDEDE;
+}
+
+.modal-title {
+    font-weight: 600;
+    -webkit-font-smoothing: antialiased;
+}
+
+.modal-footer {
+    padding: 15px;
+    text-align: right;
+    border-top: 1px solid #DEDEDE;
+}
+
+.modal-body {
+    position: relative;
+    padding: 15px;
+}
+
+.cancel {
+    float: left;
+}
+
+.switch.pull-left {
+    margin-right: 8px;
+}
+
+.modal-content {
+    border-radius: 10px;
+}
+
+.table-quickMenu {
+    border: thin $lightGrey solid;
+    border-collapse: separate;
+    border-radius: 6px;
+    box-shadow: 0px 0px 4px #d8d8d8;
+    overflow: scroll !important;
+    max-height: 500px;
+}
+
+.table-quickMenu>thead>tr>th {
+    border-width: thin;
+    border-color: $action_gray;
+    border-bottom-style: solid;
+    box-shadow: none;
+    padding: 20px 30px;
+    background-color: transparent;
+    text-align: left;
+    font-weight: 800;
+    font-size: 14px;
+    letter-spacing: 0.25px;
+    color: rgba(52, 52, 52, 1);
+}
+
+.table-quickMenu > tbody > tr > td {
+    border-color: $color_gallery_approx;
+    color: #333333;
+    font-weight: 100;
+    padding: 15px 30px;
+}
+
+.backgrid-paginator ul > li > a:hover,
+.backgrid-paginator ul > .active > a,
+.backgrid-paginator ul > .active > span {
+    background-color: #2EBC9A !important;
+    color: #fff !important;
+    &:hover {
+        background-color: none;
+    }
+}
+
+.backgrid-paginator ul {
+    display: inline-block;
+    padding-left: 0;
+    margin: 20px 0;
+    border-radius: 4px;
+    border: 1px #DDDDDD solid;
+}
+
+.backgrid {
+    td {
+        white-space: normal;
+    }
+}
+
+.select2-container--default {
+    .select2-selection--multiple {
+        background-color: $color_white_lilac_approx !important;
+        border: 1px $color_mystic_approx solid !important;
+    }
+    .select2-selection--single {
+        .select2-selection__arrow {
+            height: 34px;
+        }
+        .select2-selection__rendered {
+            line-height: 32px;
+            font-size: 14px;
+        }
+    }
+    &.select2-container--focus .select2-selection--multiple {
+        border-color: $color_bali_hai_approx !important;
+    }
+}
+
+.select2-container {
+    .select2-selection--single,
+    .select2-selection--multiple {
+        min-height: 34px;
+        .select2-selection__rendered {
+            padding-left: 12px;
+        }
+    }
+}
+
+.select2-container--default .select2-selection--multiple .select2-selection__choice {
+    background-color: $white;
+    color: $color_mountain_mist_approx;
+    border: 1px solid $tag_color;
+}
+
+.select2-container--default .select2-search--inline .select2-search__field {
+    color: #555;
+}
+
+.typeLOV {
+    .select2-container--default {
+        .select2-selection--multiple {
+            .select2-selection__rendered {
+                padding-right: 13px;
+                .select2-selection__choice {
+                    font-size: 14px;
+                    color: $color_mountain_mist_approx;
+                    border: 1px solid $color_mountain_mist_approx;
+                }
+                .select2-search__field {
+                    font-size: 14px;
+                }
+            }
+            .select2-selection__clear {
+                position: absolute;
+                float: none;
+                margin: 0px;
+                right: 4px;
+                top: 5px;
+                color: $color_mountain_mist_approx;
+            }
+        }
+    }
+}
+
+.fixedPopover {
+    position: fixed;
+}
+
+.popover.fade {
+    -webkit-transition: ease-in .1s ease-out;
+    -o-transition: ease-in .1s ease-out;
+    transition: ease-in .1s ease-out;
+}
+
+.pager {
+    margin: 0px;
+    li {
+        >button {
+            display: inline-block;
+            padding: 5px 14px;
+            background-color: #fff;
+            border: 1px solid #ddd;
+            border-radius: 15px;
+            color: $color_jungle_green_approx;
+        }
+        >button,
+        >span {
+            &:hover {
+                background-color: $color_jungle_green_approx;
+                color: $white;
+            }
+        }
+    }
+}
+
+.backgrid-paginator ul {
+    margin: 0px;
+    float: right;
+    border-radius: 10px;
+    overflow: hidden;
+}
+
+.backgrid-paginator ul > .disabled > span,
+.backgrid-paginator ul > .disabled > a,
+.backgrid-paginator ul > .disabled > a:hover {
+    cursor: pointer;
+}
+
+.popover {
+    z-index: 99;
+}
+
+.popover-content {
+    ul {
+        color: $dark_gray;
+        padding: 0px 5px;
+        margin-bottom: 0px;
+        cursor: pointer;
+        a {
+            color: $dark_gray;
+            padding: 5px;
+        }
+    }
+}

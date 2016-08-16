@@ -37,14 +37,14 @@ import java.net.UnknownHostException;
 public class LoginProcessor {
 
     private static final Logger LOG = LoggerFactory.getLogger(LoginProcessor.class);
-    public static final String METADATA_AUTHENTICATION_PREFIX = "atlas.authentication.";
-    public static final String AUTHENTICATION_METHOD = METADATA_AUTHENTICATION_PREFIX + "method";
-    public static final String AUTHENTICATION_PRINCIPAL = METADATA_AUTHENTICATION_PREFIX + "principal";
-    public static final String AUTHENTICATION_KEYTAB = METADATA_AUTHENTICATION_PREFIX + "keytab";
+    public static final String ATLAS_AUTHENTICATION_PREFIX = "atlas.authentication.";
+    public static final String AUTHENTICATION_KERBEROS_METHOD = ATLAS_AUTHENTICATION_PREFIX + "method.kerberos";
+    public static final String AUTHENTICATION_PRINCIPAL = ATLAS_AUTHENTICATION_PREFIX + "principal";
+    public static final String AUTHENTICATION_KEYTAB = ATLAS_AUTHENTICATION_PREFIX + "keytab";
 
     /**
      * Perform a SIMPLE login based on established OS identity or a kerberos based login using the configured
-     * principal and keytab (via application.properties).
+     * principal and keytab (via atlas-application.properties).
      */
     public void login() {
         // first, let's see if we're running in a hadoop cluster and have the env configured
@@ -95,12 +95,14 @@ public class LoginProcessor {
 
     protected void setupHadoopConfiguration(Configuration hadoopConfig, org.apache.commons.configuration.Configuration
             configuration) {
-        String authMethod;
-        authMethod = configuration != null ? configuration.getString(AUTHENTICATION_METHOD) : null;
+        String authMethod = "";
+        String kerberosAuthNEnabled = configuration != null ? configuration.getString(AUTHENTICATION_KERBEROS_METHOD) : null;
         // getString may return null, and would like to log the nature of the default setting
-        if (authMethod == null) {
+        if (kerberosAuthNEnabled == null || kerberosAuthNEnabled.equalsIgnoreCase("false")) {
             LOG.info("No authentication method configured.  Defaulting to simple authentication");
             authMethod = "simple";
+        } else if (kerberosAuthNEnabled.equalsIgnoreCase("true")) {
+            authMethod = "kerberos";
         }
         SecurityUtil
                 .setAuthenticationMethod(UserGroupInformation.AuthenticationMethod.valueOf(authMethod.toUpperCase()),

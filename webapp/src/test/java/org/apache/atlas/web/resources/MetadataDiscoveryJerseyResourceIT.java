@@ -19,9 +19,12 @@
 package org.apache.atlas.web.resources;
 
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
 import com.sun.jersey.api.client.ClientResponse;
 import com.sun.jersey.api.client.WebResource;
+
 import org.apache.atlas.AtlasClient;
+import org.apache.atlas.AtlasServiceException;
 import org.apache.atlas.typesystem.Referenceable;
 import org.apache.atlas.typesystem.Struct;
 import org.apache.atlas.typesystem.TypesDef;
@@ -42,12 +45,18 @@ import org.testng.annotations.Test;
 
 import javax.ws.rs.HttpMethod;
 import javax.ws.rs.core.Response;
+
 import java.util.List;
+
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.fail;
 
 /**
  * Search Integration Tests.
  */
 public class MetadataDiscoveryJerseyResourceIT extends BaseResourceIT {
+
+    private String tagName;
 
     @BeforeClass
     public void setUp() throws Exception {
@@ -64,7 +73,7 @@ public class MetadataDiscoveryJerseyResourceIT extends BaseResourceIT {
 
         ClientResponse clientResponse = resource.accept(Servlets.JSON_MEDIA_TYPE).type(Servlets.JSON_MEDIA_TYPE)
                 .method(HttpMethod.GET, ClientResponse.class);
-        Assert.assertEquals(clientResponse.getStatus(), Response.Status.OK.getStatusCode());
+        assertEquals(clientResponse.getStatus(), Response.Status.OK.getStatusCode());
 
         String responseAsString = clientResponse.getEntity(String.class);
         Assert.assertNotNull(responseAsString);
@@ -72,16 +81,71 @@ public class MetadataDiscoveryJerseyResourceIT extends BaseResourceIT {
         JSONObject response = new JSONObject(responseAsString);
         Assert.assertNotNull(response.get(AtlasClient.REQUEST_ID));
 
-        Assert.assertEquals(response.getString("query"), dslQuery);
-        Assert.assertEquals(response.getString("queryType"), "dsl");
+        assertEquals(response.getString("query"), dslQuery);
+        assertEquals(response.getString("queryType"), "dsl");
 
         JSONArray results = response.getJSONArray(AtlasClient.RESULTS);
         Assert.assertNotNull(results);
-        Assert.assertEquals(results.length(), 1);
+        assertEquals(results.length(), 2);
 
         int numRows = response.getInt(AtlasClient.COUNT);
-        Assert.assertEquals(numRows, 1);
+        assertEquals(numRows, 2);
+    }
 
+    @Test
+    public void testSearchDSLLimits() throws Exception {
+        Referenceable entity = new Referenceable("dsl_test_type");
+        entity.set("name", randomString());
+        entity.set("description", randomString());
+        createInstance(entity);
+
+        //search without new parameters of limit and offset should work
+        String dslQuery = "from dsl_test_type";
+        WebResource resource = service.path("api/atlas/discovery/search/dsl").queryParam("query", dslQuery);
+
+        ClientResponse clientResponse = resource.accept(Servlets.JSON_MEDIA_TYPE).type(Servlets.JSON_MEDIA_TYPE)
+                                                .method(HttpMethod.GET, ClientResponse.class);
+        assertEquals(clientResponse.getStatus(), Response.Status.OK.getStatusCode());
+
+        //higher limit, all results returned
+        JSONArray results = serviceClient.searchByDSL(dslQuery, 10, 0);
+        assertEquals(results.length(), 2);
+
+        //default limit and offset -1, all results returned
+        results = serviceClient.searchByDSL(dslQuery, -1, -1);
+        assertEquals(results.length(), 2);
+
+        //uses the limit parameter passed
+        results = serviceClient.searchByDSL(dslQuery, 1, 0);
+        assertEquals(results.length(), 1);
+
+        //uses the offset parameter passed
+        results = serviceClient.searchByDSL(dslQuery, 10, 1);
+        assertEquals(results.length(), 1);
+
+        //limit > 0
+        try {
+            serviceClient.searchByDSL(dslQuery, 0, 10);
+            fail("Expected BAD_REQUEST");
+        } catch (AtlasServiceException e) {
+            assertEquals(e.getStatus(), ClientResponse.Status.BAD_REQUEST, "Got " + e.getStatus());
+        }
+
+        //limit > maxlimit
+        try {
+            serviceClient.searchByDSL(dslQuery, Integer.MAX_VALUE, 10);
+            fail("Expected BAD_REQUEST");
+        } catch (AtlasServiceException e) {
+            assertEquals(e.getStatus(), ClientResponse.Status.BAD_REQUEST, "Got " + e.getStatus());
+        }
+
+        //offset >= 0
+        try {
+            serviceClient.searchByDSL(dslQuery, 10, -2);
+            fail("Expected BAD_REQUEST");
+        } catch (AtlasServiceException e) {
+            assertEquals(e.getStatus(), ClientResponse.Status.BAD_REQUEST, "Got " + e.getStatus());
+        }
     }
 
     @Test
@@ -91,17 +155,17 @@ public class MetadataDiscoveryJerseyResourceIT extends BaseResourceIT {
 
         ClientResponse clientResponse = resource.accept(Servlets.JSON_MEDIA_TYPE).type(Servlets.JSON_MEDIA_TYPE)
                 .method(HttpMethod.GET, ClientResponse.class);
-        Assert.assertEquals(clientResponse.getStatus(), Response.Status.BAD_REQUEST.getStatusCode());
+        assertEquals(clientResponse.getStatus(), Response.Status.BAD_REQUEST.getStatusCode());
     }
 
     @Test
     public void testSearchUsingGremlin() throws Exception {
         String query = "g.V.has('type', 'dsl_test_type').toList()";
-        WebResource resource = service.path("api/atlas/discovery/search").queryParam("query", query);
+        WebResource resource = service.path("api/atlas/discovery/search/gremlin").queryParam("query", query);
 
         ClientResponse clientResponse = resource.accept(Servlets.JSON_MEDIA_TYPE).type(Servlets.JSON_MEDIA_TYPE)
                 .method(HttpMethod.GET, ClientResponse.class);
-        Assert.assertEquals(clientResponse.getStatus(), Response.Status.OK.getStatusCode());
+        assertEquals(clientResponse.getStatus(), Response.Status.OK.getStatusCode());
 
         String responseAsString = clientResponse.getEntity(String.class);
         Assert.assertNotNull(responseAsString);
@@ -109,8 +173,8 @@ public class MetadataDiscoveryJerseyResourceIT extends BaseResourceIT {
         JSONObject response = new JSONObject(responseAsString);
         Assert.assertNotNull(response.get(AtlasClient.REQUEST_ID));
 
-        Assert.assertEquals(response.getString("query"), query);
-        Assert.assertEquals(response.getString("queryType"), "gremlin");
+        assertEquals(response.getString("query"), query);
+        assertEquals(response.getString("queryType"), "gremlin");
     }
 
     @Test
@@ -120,7 +184,7 @@ public class MetadataDiscoveryJerseyResourceIT extends BaseResourceIT {
 
         ClientResponse clientResponse = resource.accept(Servlets.JSON_MEDIA_TYPE).type(Servlets.JSON_MEDIA_TYPE)
                 .method(HttpMethod.GET, ClientResponse.class);
-        Assert.assertEquals(clientResponse.getStatus(), Response.Status.OK.getStatusCode());
+        assertEquals(clientResponse.getStatus(), Response.Status.OK.getStatusCode());
 
         String responseAsString = clientResponse.getEntity(String.class);
         Assert.assertNotNull(responseAsString);
@@ -128,71 +192,100 @@ public class MetadataDiscoveryJerseyResourceIT extends BaseResourceIT {
         JSONObject response = new JSONObject(responseAsString);
         Assert.assertNotNull(response.get(AtlasClient.REQUEST_ID));
 
-        Assert.assertEquals(response.getString("query"), query);
-        Assert.assertEquals(response.getString("queryType"), "dsl");
+        assertEquals(response.getString("query"), query);
+        assertEquals(response.getString("queryType"), "dsl");
     }
 
-    @Test(enabled = false)
-    public void testSearchUsingFullText() throws Exception {
-        String query = "foundation_etl";
-        JSONObject response = serviceClient.searchByFullText(query);
+    @Test
+    public void testSearchFullTextOnDSLFailure() throws Exception {
+        String query = "*";
+        WebResource resource = service.path("api/atlas/discovery/search").queryParam("query", query);
+
+        ClientResponse clientResponse = resource.accept(Servlets.JSON_MEDIA_TYPE).type(Servlets.JSON_MEDIA_TYPE)
+            .method(HttpMethod.GET, ClientResponse.class);
+        assertEquals(clientResponse.getStatus(), Response.Status.OK.getStatusCode());
+
+        String responseAsString = clientResponse.getEntity(String.class);
+        Assert.assertNotNull(responseAsString);
+
+        JSONObject response = new JSONObject(responseAsString);
         Assert.assertNotNull(response.get(AtlasClient.REQUEST_ID));
 
-        Assert.assertEquals(response.getString("query"), query);
-        Assert.assertEquals(response.getString("queryType"), "full-text");
+        assertEquals(response.getString("query"), query);
+        assertEquals(response.getString("queryType"), "full-text");
+    }
+
+    @Test(dependsOnMethods = "testSearchDSLLimits")
+    public void testSearchUsingFullText() throws Exception {
+        JSONObject response = serviceClient.searchByFullText(tagName, 10, 0);
+        Assert.assertNotNull(response.get(AtlasClient.REQUEST_ID));
+
+        assertEquals(response.getString("query"), tagName);
+        assertEquals(response.getString("queryType"), "full-text");
 
         JSONArray results = response.getJSONArray(AtlasClient.RESULTS);
-        Assert.assertEquals(results.length(), 1);
+        assertEquals(results.length(), 1, "Results: " + results);
 
         JSONObject row = results.getJSONObject(0);
         Assert.assertNotNull(row.get("guid"));
-        Assert.assertEquals(row.getString("typeName"), "dsl_test_type");
+        assertEquals(row.getString("typeName"), "dsl_test_type");
         Assert.assertNotNull(row.get("score"));
 
         int numRows = response.getInt(AtlasClient.COUNT);
-        Assert.assertEquals(numRows, 1);
+        assertEquals(numRows, 1);
+
+        //API works without limit and offset
+        String query = "dsl_test_type";
+        WebResource resource = service.path("api/atlas/discovery/search/fulltext").queryParam("query", query);
+        ClientResponse clientResponse = resource.accept(Servlets.JSON_MEDIA_TYPE).type(Servlets.JSON_MEDIA_TYPE)
+                                                .method(HttpMethod.GET, ClientResponse.class);
+        assertEquals(clientResponse.getStatus(), Response.Status.OK.getStatusCode());
+        results = new JSONObject(clientResponse.getEntity(String.class)).getJSONArray(AtlasClient.RESULTS);
+        assertEquals(results.length(), 2);
+
+        //verify passed in limits and offsets are used
+        //higher limit and 0 offset returns all results
+        results = serviceClient.searchByFullText(query, 10, 0).getJSONArray(AtlasClient.RESULTS);
+        assertEquals(results.length(), 2);
+
+        //offset is used
+        results = serviceClient.searchByFullText(query, 10, 1).getJSONArray(AtlasClient.RESULTS);
+        assertEquals(results.length(), 1);
+
+        //limit is used
+        results = serviceClient.searchByFullText(query, 1, 0).getJSONArray(AtlasClient.RESULTS);
+        assertEquals(results.length(), 1);
+
+        //higher offset returns 0 results
+        results = serviceClient.searchByFullText(query, 1, 2).getJSONArray(AtlasClient.RESULTS);
+        assertEquals(results.length(), 0);
     }
 
     private void createTypes() throws Exception {
         HierarchicalTypeDefinition<ClassType> dslTestTypeDefinition = TypesUtil
-                .createClassTypeDef("dsl_test_type", ImmutableList.<String>of(),
+                .createClassTypeDef("dsl_test_type", ImmutableSet.<String>of(),
                         TypesUtil.createUniqueRequiredAttrDef("name", DataTypes.STRING_TYPE),
                         TypesUtil.createRequiredAttrDef("description", DataTypes.STRING_TYPE));
 
         HierarchicalTypeDefinition<TraitType> classificationTraitDefinition = TypesUtil
-                .createTraitTypeDef("Classification", ImmutableList.<String>of(),
+                .createTraitTypeDef("Classification", ImmutableSet.<String>of(),
                         TypesUtil.createRequiredAttrDef("tag", DataTypes.STRING_TYPE));
-        HierarchicalTypeDefinition<TraitType> piiTrait =
-                TypesUtil.createTraitTypeDef("PII_TYPE", ImmutableList.<String>of());
-        HierarchicalTypeDefinition<TraitType> phiTrait =
-                TypesUtil.createTraitTypeDef("PHI", ImmutableList.<String>of());
-        HierarchicalTypeDefinition<TraitType> pciTrait =
-                TypesUtil.createTraitTypeDef("PCI", ImmutableList.<String>of());
-        HierarchicalTypeDefinition<TraitType> soxTrait =
-                TypesUtil.createTraitTypeDef("SOX", ImmutableList.<String>of());
-        HierarchicalTypeDefinition<TraitType> secTrait =
-                TypesUtil.createTraitTypeDef("SEC", ImmutableList.<String>of());
-        HierarchicalTypeDefinition<TraitType> financeTrait =
-                TypesUtil.createTraitTypeDef("Finance", ImmutableList.<String>of());
-
         TypesDef typesDef = TypesUtil.getTypesDef(ImmutableList.<EnumTypeDefinition>of(), ImmutableList.<StructTypeDefinition>of(),
-                        ImmutableList
-                                .of(classificationTraitDefinition, piiTrait, phiTrait, pciTrait, soxTrait, secTrait,
-                                        financeTrait), ImmutableList.of(dslTestTypeDefinition));
+                        ImmutableList.of(classificationTraitDefinition), ImmutableList.of(dslTestTypeDefinition));
         createType(typesDef);
     }
 
     private Id createInstance() throws Exception {
-        Referenceable entityInstance =
-                new Referenceable("dsl_test_type", "Classification", "PII_TYPE", "PHI", "PCI", "SOX", "SEC", "Finance");
+        Referenceable entityInstance = new Referenceable("dsl_test_type", "Classification");
         entityInstance.set("name", "foo name");
         entityInstance.set("description", "bar description");
 
         Struct traitInstance = (Struct) entityInstance.getTrait("Classification");
-        traitInstance.set("tag", "foundation_etl");
+        tagName = randomString();
+        traitInstance.set("tag", tagName);
 
         List<String> traits = entityInstance.getTraits();
-        Assert.assertEquals(traits.size(), 7);
+        assertEquals(traits.size(), 1);
 
         return createInstance(entityInstance);
     }

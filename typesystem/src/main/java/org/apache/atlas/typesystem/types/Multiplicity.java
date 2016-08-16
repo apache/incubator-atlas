@@ -25,8 +25,8 @@ public final class Multiplicity {
 
     public static final Multiplicity OPTIONAL = new Multiplicity(0, 1, false);
     public static final Multiplicity REQUIRED = new Multiplicity(1, 1, false);
-    public static final Multiplicity COLLECTION = new Multiplicity(0, Integer.MAX_VALUE, false);
-    public static final Multiplicity SET = new Multiplicity(0, Integer.MAX_VALUE, true);
+    public static final Multiplicity COLLECTION = new Multiplicity(1, Integer.MAX_VALUE, false);
+    public static final Multiplicity SET = new Multiplicity(1, Integer.MAX_VALUE, true);
 
     public final int lower;
     public final int upper;
@@ -79,8 +79,7 @@ public final class Multiplicity {
 
     @Override
     public String toString() {
-        return "Multiplicity{" +
-                "lower=" + lower +
+        return "{lower=" + lower +
                 ", upper=" + upper +
                 ", isUnique=" + isUnique +
                 '}';

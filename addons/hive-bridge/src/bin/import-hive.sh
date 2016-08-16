@@ -31,15 +31,6 @@ done
 BASEDIR=`dirname ${PRG}`
 BASEDIR=`cd ${BASEDIR}/..;pwd`
 
-if [ -z "$METADATA_CONF" ]; then
-  METADATA_CONF=${BASEDIR}/conf
-fi
-export METADATA_CONF
-
-if [ -f "${METADATA_CONF}/atlas-env.sh" ]; then
-  . "${METADATA_CONF}/atlas-env.sh"
-fi
-
 if test -z "${JAVA_HOME}"
 then
     JAVA_BIN=`which java`
@@ -55,50 +46,79 @@ if [ ! -e "${JAVA_BIN}" ] || [ ! -e "${JAR_BIN}" ]; then
   exit 1
 fi
 
-# Construct classpath using Atlas conf directory
-# and jars from bridge/hive and hook/hive directories.
-METADATACPPATH="$METADATA_CONF"
-
-for i in "${BASEDIR}/bridge/hive/"*.jar; do
-  METADATACPPATH="${METADATACPPATH}:$i"
-done
-
-for i in "${BASEDIR}/hook/hive/"*.jar; do
-  METADATACPPATH="${METADATACPPATH}:$i"
+# Construct Atlas classpath using jars from hook/hive/atlas-hive-plugin-impl/ directory.
+for i in "${BASEDIR}/hook/hive/atlas-hive-plugin-impl/"*.jar; do
+  ATLASCPPATH="${ATLASCPPATH}:$i"
 done
 
 # log dir for applications
-METADATA_LOG_DIR="${METADATA_LOG_DIR:-$BASEDIR/logs}"
-export METADATA_LOG_DIR
-LOGFILE="$METADATA_LOG_DIR/import-hive.log"
+ATLAS_LOG_DIR="${ATLAS_LOG_DIR:-$BASEDIR/logs}"
+export ATLAS_LOG_DIR
+LOGFILE="$ATLAS_LOG_DIR/import-hive.log"
 
 TIME=`date +%Y%m%d%H%M%s`
 
 #Add hive conf in classpath
 if [ ! -z "$HIVE_CONF_DIR" ]; then
-    HIVE_CP=$HIVE_CONF_DIR
+    HIVE_CONF=$HIVE_CONF_DIR
 elif [ ! -z "$HIVE_HOME" ]; then
-    HIVE_CP="$HIVE_HOME/conf"
+    HIVE_CONF="$HIVE_HOME/conf"
 elif [ -e /etc/hive/conf ]; then
-    HIVE_CP="/etc/hive/conf"
+    HIVE_CONF="/etc/hive/conf"
 else
     echo "Could not find a valid HIVE configuration"
     exit 1
 fi
-export HIVE_CP
 
-CP="${HIVE_CP}:${METADATACPPATH}"
+echo Using Hive configuration directory ["$HIVE_CONF"]
+
+
+if [ -f "${HIVE_CONF}/hive-env.sh" ]; then
+  . "${HIVE_CONF}/hive-env.sh"
+fi
+
+if [ -z "$HIVE_HOME" ]; then
+    if [ -d "${BASEDIR}/../hive" ]; then
+        HIVE_HOME=${BASEDIR}/../hive
+    else
+        echo "Please set HIVE_HOME to the root of Hive installation"
+        exit 1
+    fi
+fi
+
+HIVE_CP="${HIVE_CONF}"
+
+for i in "${HIVE_HOME}/lib/"*.jar; do
+    HIVE_CP="${HIVE_CP}:$i"
+done
+
+#Add hadoop conf in classpath
+if [ ! -z "$HADOOP_CLASSPATH" ]; then
+    HADOOP_CP=$HADOOP_CLASSPATH
+elif [ ! -z "$HADOOP_HOME" ]; then
+    HADOOP_CP=`$HADOOP_HOME/bin/hadoop classpath`
+elif [ $(command -v hadoop) ]; then
+    HADOOP_CP=`hadoop classpath`
+    echo $HADOOP_CP
+else
+    echo "Environment variable HADOOP_CLASSPATH or HADOOP_HOME need to be set"
+    exit 1
+fi
+
+CP="${ATLASCPPATH}:${HIVE_CP}:${HADOOP_CP}"
 
 # If running in cygwin, convert pathnames and classpath to Windows format.
 if [ "${CYGWIN}" == "true" ]
 then
-   METADATA_LOG_DIR=`cygpath -w ${METADATA_LOG_DIR}`
+   ATLAS_LOG_DIR=`cygpath -w ${ATLAS_LOG_DIR}`
    LOGFILE=`cygpath -w ${LOGFILE}`
    HIVE_CP=`cygpath -w ${HIVE_CP}`
+   HADOOP_CP=`cygpath -w ${HADOOP_CP}`
    CP=`cygpath -w -p ${CP}`
 fi
 
-JAVA_PROPERTIES="$METADATA_OPTS -Datlas.log.dir=$METADATA_LOG_DIR -Datlas.log.file=import-hive.log -Dlog4j.configuration=atlas-log4j.xml"
+JAVA_PROPERTIES="$ATLAS_OPTS -Datlas.log.dir=$ATLAS_LOG_DIR -Datlas.log.file=import-hive.log
+-Dlog4j.configuration=atlas-log4j.xml"
 shift
 
 while [[ ${1} =~ ^\-D ]]; do
@@ -106,7 +126,6 @@ while [[ ${1} =~ ^\-D ]]; do
   shift
 done
 
-echo Using Hive configuration directory ["$HIVE_CP"]
 echo "Log file for import is $LOGFILE"
 
 "${JAVA_BIN}" ${JAVA_PROPERTIES} -cp "${CP}" org.apache.atlas.hive.bridge.HiveMetaStoreBridge

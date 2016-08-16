@@ -1,10 +1,11 @@
-/*
- * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with
- * this work for additional information regarding copyright ownership.
- * The ASF licenses this file to You under the Apache License, Version 2.0
- * (the "License"); you may not use this file except in compliance with
- * the License.  You may obtain a copy of the License at
+/**
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
  *
  *     http://www.apache.org/licenses/LICENSE-2.0
  *
@@ -14,25 +15,23 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package org.apache.atlas.notification;
 
 import com.google.inject.AbstractModule;
 import com.google.inject.Singleton;
-import com.google.inject.multibindings.Multibinder;
 import org.apache.atlas.kafka.KafkaNotification;
 import org.apache.atlas.kafka.KafkaNotificationProvider;
-import org.apache.atlas.service.Service;
 
+/**
+ * Notification module for Guice.
+ *
+ * NOTE: This module is loaded by hook clients like hive hook etc. Don't add any server specific bindings here.
+ */
 public class NotificationModule extends AbstractModule {
 
     @Override
     protected void configure() {
         bind(NotificationInterface.class).to(KafkaNotification.class).in(Singleton.class);
         bind(KafkaNotification.class).toProvider(KafkaNotificationProvider.class).in(Singleton.class);
-
-        Multibinder<Service> serviceBinder = Multibinder.newSetBinder(binder(), Service.class);
-        serviceBinder.addBinding().to(KafkaNotification.class);
-        serviceBinder.addBinding().to(NotificationHookConsumer.class);
     }
 }

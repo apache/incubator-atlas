@@ -26,17 +26,21 @@ import org.apache.atlas.AtlasException;
 import org.apache.atlas.typesystem.IReferenceableInstance;
 import org.apache.atlas.typesystem.persistence.Id;
 import org.apache.commons.lang3.StringUtils;
+import org.joda.time.DateTime;
+import org.joda.time.DateTimeZone;
+import org.joda.time.format.DateTimeFormatter;
+import org.joda.time.format.ISODateTimeFormat;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.nio.charset.Charset;
 import java.security.MessageDigest;
-import java.text.ParseException;
 import java.util.Collection;
 import java.util.Date;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 public class DataTypes {
 
@@ -57,6 +61,7 @@ public class DataTypes {
     static String MAP_TYPE_SUFFIX = ">";
 
     public static String arrayTypeName(String elemTypeName) {
+        assert elemTypeName != null;
         return String.format("%s%s%s", ARRAY_TYPE_PREFIX, elemTypeName, ARRAY_TYPE_SUFFIX);
     }
 
@@ -69,6 +74,8 @@ public class DataTypes {
     }
 
     public static String mapTypeName(IDataType keyType, IDataType valueType) {
+        assert keyType != null;
+        assert valueType != null;
         return mapTypeName(keyType.getName(), valueType.getName());
     }
 
@@ -83,6 +90,10 @@ public class DataTypes {
     }
 
     public static abstract class PrimitiveType<T> extends AbstractDataType<T> {
+        public PrimitiveType(String name, String description) {
+            super(name, description);
+        }
+
         @Override
         public TypeCategory getTypeCategory() {
             return TypeCategory.PRIMITIVE;
@@ -113,11 +124,7 @@ public class DataTypes {
         private static final String name = "boolean".intern();
 
         private BooleanType() {
-        }
-
-        @Override
-        public String getName() {
-            return name;
+            super(name, null);
         }
 
         @Override
@@ -146,11 +153,7 @@ public class DataTypes {
         private static final String name = "byte".intern();
 
         private ByteType() {
-        }
-
-        @Override
-        public String getName() {
-            return name;
+            super(name, null);
         }
 
         @Override
@@ -186,11 +189,7 @@ public class DataTypes {
         private static final String name = "short".intern();
 
         private ShortType() {
-        }
-
-        @Override
-        public String getName() {
-            return name;
+            super(name, null);
         }
 
         @Override
@@ -219,11 +218,7 @@ public class DataTypes {
         private static final String name = "int".intern();
 
         private IntType() {
-        }
-
-        @Override
-        public String getName() {
-            return name;
+            super(name, null);
         }
 
         @Override
@@ -252,11 +247,7 @@ public class DataTypes {
         private static final String name = "long".intern();
 
         private LongType() {
-        }
-
-        @Override
-        public String getName() {
-            return name;
+            super(name, null);
         }
 
         @Override
@@ -285,11 +276,7 @@ public class DataTypes {
         private static final String name = "float".intern();
 
         private FloatType() {
-        }
-
-        @Override
-        public String getName() {
-            return name;
+            super(name, null);
         }
 
         @Override
@@ -318,11 +305,7 @@ public class DataTypes {
         private static final String name = "double".intern();
 
         private DoubleType() {
-        }
-
-        @Override
-        public String getName() {
-            return name;
+            super(name, null);
         }
 
         @Override
@@ -351,11 +334,7 @@ public class DataTypes {
         private static final String name = "biginteger".intern();
 
         private BigIntegerType() {
-        }
-
-        @Override
-        public String getName() {
-            return name;
+            super(name, null);
         }
 
         @Override
@@ -390,11 +369,7 @@ public class DataTypes {
         private static final String name = "bigdecimal".intern();
 
         private BigDecimalType() {
-        }
-
-        @Override
-        public String getName() {
-            return name;
+            super(name, null);
         }
 
         @Override
@@ -429,12 +404,10 @@ public class DataTypes {
         private static final String name = "date".intern();
 
         private DateType() {
+            super(name, null);
         }
 
-        @Override
-        public String getName() {
-            return name;
-        }
+        private static final DateTimeFormatter utcDateFormat = ISODateTimeFormat.dateTime();
 
         @Override
         public Date convert(Object val, Multiplicity m) throws AtlasException {
@@ -443,8 +416,8 @@ public class DataTypes {
                     return (Date) val;
                 } else if (val instanceof String) {
                     try {
-                        return TypeSystem.getInstance().getDateFormat().parse((String) val);
-                    } catch (ParseException ne) {
+                        return utcDateFormat.parseDateTime((String)val).toDate();
+                    } catch (Exception ne) {
                         throw new ValueConversionException(this, val, ne);
                     }
                 } else if (val instanceof Number) {
@@ -457,8 +430,8 @@ public class DataTypes {
         }
 
         @Override
-        public void output(Date val, Appendable buf, String prefix) throws AtlasException {
-            TypeUtils.outputVal(val == null ? "<null>" : TypeSystem.getInstance().getDateFormat().format(val), buf,
+        public void output(Date val, Appendable buf, String prefix, Set<Date> inProcess) throws AtlasException {
+            TypeUtils.outputVal(val == null ? "<null>" : utcDateFormat.print(new DateTime(val).withZone(DateTimeZone.UTC)), buf,
                     prefix);
         }
 
@@ -472,16 +445,16 @@ public class DataTypes {
         private static final String name = "string".intern();
 
         private StringType() {
-        }
-
-        @Override
-        public String getName() {
-            return name;
+            super(name, null);
         }
 
         @Override
         public String convert(Object val, Multiplicity m) throws AtlasException {
             if (val != null && (!(val instanceof String) || StringUtils.isNotEmpty((CharSequence) val))) {
+                return val.toString();
+            }
+
+            if (m.nullAllowed() && val != null){
                 return val.toString();
             }
             return convertNull(m);
@@ -493,13 +466,11 @@ public class DataTypes {
     }
 
     public static class ArrayType extends AbstractDataType<ImmutableCollection<?>> {
-        private final String nm;
         private IDataType elemType;
 
         public ArrayType(IDataType elemType) {
-            assert elemType != null;
+            super(arrayTypeName(elemType), null);
             this.elemType = elemType;
-            this.nm = arrayTypeName(elemType);
         }
 
         public IDataType getElemType() {
@@ -508,11 +479,6 @@ public class DataTypes {
 
         protected void setElemType(IDataType elemType) {
             this.elemType = elemType;
-        }
-
-        @Override
-        public String getName() {
-            return nm;
         }
 
         @Override
@@ -589,16 +555,13 @@ public class DataTypes {
 
     public static class MapType extends AbstractDataType<ImmutableMap<?, ?>> {
 
-        private final String nm;
         private IDataType keyType;
         private IDataType valueType;
 
         public MapType(IDataType keyType, IDataType valueType) {
-            assert keyType != null;
-            assert valueType != null;
+            super(mapTypeName(keyType, valueType), null);
             this.keyType = keyType;
             this.valueType = valueType;
-            this.nm = mapTypeName(keyType, valueType);
         }
 
         public IDataType getKeyType() {
@@ -618,11 +581,6 @@ public class DataTypes {
         }
 
         @Override
-        public String getName() {
-            return nm;
-        }
-
-        @Override
         public ImmutableMap<?, ?> convert(Object val, Multiplicity m) throws AtlasException {
             if (val != null) {
                 Iterator<Map.Entry> it = null;
@@ -634,9 +592,7 @@ public class DataTypes {
                         b.put(keyType.convert(e.getKey(),
                                         TypeSystem.getInstance().allowNullsInCollections() ? Multiplicity.OPTIONAL :
                                                 Multiplicity.REQUIRED),
-                                        valueType.convert(e.getValue(),
-                                        TypeSystem.getInstance().allowNullsInCollections() ? Multiplicity.OPTIONAL :
-                                                Multiplicity.REQUIRED));
+                                        valueType.convert(e.getValue(), Multiplicity.OPTIONAL));
                     }
                     return b.build();
                 } else {

@@ -79,7 +79,7 @@ public class EntityNotificationImplTest {
     }
 
     @Test
-    public void testGetAllTraits_superTraits() throws Exception {
+    public void testGetAllTraitsSuperTraits() throws Exception {
 
         TypeSystem typeSystem = mock(TypeSystem.class);
 
@@ -131,7 +131,7 @@ public class EntityNotificationImplTest {
         assertTrue(entityNotification2.equals(entityNotification));
     }
 
-    private Referenceable getEntity(String id, IStruct... traits) {
+    public static Referenceable getEntity(String id, IStruct... traits) {
         String typeName = "typeName";
         Map<String, Object> values = new HashMap<>();
 

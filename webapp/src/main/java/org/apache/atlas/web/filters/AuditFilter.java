@@ -20,6 +20,7 @@ package org.apache.atlas.web.filters;
 
 import com.google.inject.Singleton;
 import org.apache.atlas.AtlasClient;
+import org.apache.atlas.RequestContext;
 import org.apache.atlas.web.util.DateTimeHelper;
 import org.apache.atlas.web.util.Servlets;
 import org.slf4j.Logger;
@@ -60,15 +61,19 @@ public class AuditFilter implements Filter {
         final String requestId = UUID.randomUUID().toString();
         final Thread currentThread = Thread.currentThread();
         final String oldName = currentThread.getName();
+        String user = getUserFromRequest(httpRequest);
 
         try {
             currentThread.setName(formatName(oldName, requestId));
-            recordAudit(httpRequest, requestTimeISO9601);
+            RequestContext requestContext = RequestContext.createContext();
+            requestContext.setUser(user);
+            recordAudit(httpRequest, requestTimeISO9601, user);
             filterChain.doFilter(request, response);
         } finally {
             // put the request id into the response so users can trace logs for this request
             ((HttpServletResponse) response).setHeader(AtlasClient.REQUEST_ID, requestId);
             currentThread.setName(oldName);
+            RequestContext.clear();
         }
     }
 
@@ -76,15 +81,14 @@ public class AuditFilter implements Filter {
         return oldName + " - " + requestId;
     }
 
-    private void recordAudit(HttpServletRequest httpRequest, String whenISO9601) {
-        final String who = getUserFromRequest(httpRequest);
+    private void recordAudit(HttpServletRequest httpRequest, String whenISO9601, String who) {
         final String fromHost = httpRequest.getRemoteHost();
         final String fromAddress = httpRequest.getRemoteAddr();
         final String whatRequest = httpRequest.getMethod();
         final String whatURL = Servlets.getRequestURL(httpRequest);
         final String whatAddrs = httpRequest.getLocalAddr();
 
-        LOG.debug("Audit: {}/{} performed request {} {} ({}) at time {}", who, fromAddress, whatRequest, whatURL,
+        LOG.info("Audit: {}/{} performed request {} {} ({}) at time {}", who, fromAddress, whatRequest, whatURL,
                 whatAddrs, whenISO9601);
         audit(who, fromAddress, whatRequest, fromHost, whatURL, whatAddrs, whenISO9601);
     }
@@ -95,7 +99,7 @@ public class AuditFilter implements Filter {
         return userFromRequest == null ? "UNKNOWN" : userFromRequest;
     }
 
-    private void audit(String who, String fromAddress, String whatRequest, String fromHost, String whatURL, String whatAddrs,
+    public static void audit(String who, String fromAddress, String whatRequest, String fromHost, String whatURL, String whatAddrs,
             String whenISO9601) {
         AUDIT_LOG.info("Audit: {}/{}-{} performed request {} {} ({}) at time {}", who, fromAddress, fromHost, whatRequest, whatURL,
                 whatAddrs, whenISO9601);
