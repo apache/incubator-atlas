@@ -17,13 +17,12 @@
  */
 
 package org.apache.atlas.typesystem.exception;
-import org.apache.atlas.AtlasException;
 
 /**
  * A simple wrapper for  404.
  * Thrown when a requested trait can not be found.
  */
-public class TraitNotFoundException extends AtlasException{
+public class TraitNotFoundException extends NotFoundException {
     public TraitNotFoundException() {
     }
 

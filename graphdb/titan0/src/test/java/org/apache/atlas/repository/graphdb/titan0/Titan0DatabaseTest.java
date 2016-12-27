@@ -30,10 +30,12 @@ import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
 
 import org.apache.atlas.AtlasException;
 import org.apache.atlas.repository.Constants;
+import org.apache.atlas.repository.graphdb.AtlasCardinality;
 import org.apache.atlas.repository.graphdb.AtlasEdge;
 import org.apache.atlas.repository.graphdb.AtlasEdgeDirection;
 import org.apache.atlas.repository.graphdb.AtlasGraph;
@@ -43,7 +45,6 @@ import org.apache.atlas.repository.graphdb.AtlasGraphQuery.ComparisionOperator;
 import org.apache.atlas.repository.graphdb.AtlasPropertyKey;
 import org.apache.atlas.repository.graphdb.AtlasVertex;
 import org.apache.atlas.typesystem.types.DataTypes.TypeCategory;
-import org.apache.atlas.typesystem.types.Multiplicity;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.Test;
 
@@ -57,16 +58,16 @@ public class Titan0DatabaseTest {
 
     private <V, E> AtlasGraph<V, E> getGraph() {
         if (atlasGraph == null) {
-            Titan0Database db = new Titan0Database();
+            Titan0GraphDatabase db = new Titan0GraphDatabase();
             atlasGraph = db.getGraph();
             AtlasGraphManagement mgmt = atlasGraph.getManagementSystem();
             // create the index (which defines these properties as being mult
             // many)
-            for (String propertyName : AtlasGraphManagement.MULTIPLICITY_MANY_PROPERTY_KEYS) {
+            for (String propertyName : new String[]{"__superTypeNames", "__traitNames"}) {
                 AtlasPropertyKey propertyKey = mgmt.getPropertyKey(propertyName);
                 if (propertyKey == null) {
-                    propertyKey = mgmt.makePropertyKey(propertyName, String.class, Multiplicity.SET);
-                    mgmt.createCompositeIndex(propertyName, propertyKey, false);
+                    propertyKey = mgmt.makePropertyKey(propertyName, String.class, AtlasCardinality.SET);
+                    mgmt.createExactMatchIndex(propertyName, false, Collections.singletonList(propertyKey));
                 }
             }
             mgmt.commit();
@@ -89,38 +90,24 @@ public class Titan0DatabaseTest {
 
         testProperty(graph, "booleanProperty", Boolean.TRUE);
         testProperty(graph, "booleanProperty", Boolean.FALSE);
-        testProperty(graph, "booleanProperty", new Boolean(Boolean.TRUE));
-        testProperty(graph, "booleanProperty", new Boolean(Boolean.FALSE));
 
         testProperty(graph, "byteProperty", Byte.MAX_VALUE);
         testProperty(graph, "byteProperty", Byte.MIN_VALUE);
-        testProperty(graph, "byteProperty", new Byte(Byte.MAX_VALUE));
-        testProperty(graph, "byteProperty", new Byte(Byte.MIN_VALUE));
 
         testProperty(graph, "shortProperty", Short.MAX_VALUE);
         testProperty(graph, "shortProperty", Short.MIN_VALUE);
-        testProperty(graph, "shortProperty", new Short(Short.MAX_VALUE));
-        testProperty(graph, "shortProperty", new Short(Short.MIN_VALUE));
 
         testProperty(graph, "intProperty", Integer.MAX_VALUE);
         testProperty(graph, "intProperty", Integer.MIN_VALUE);
-        testProperty(graph, "intProperty", new Integer(Integer.MAX_VALUE));
-        testProperty(graph, "intProperty", new Integer(Integer.MIN_VALUE));
 
         testProperty(graph, "longProperty", Long.MIN_VALUE);
         testProperty(graph, "longProperty", Long.MAX_VALUE);
-        testProperty(graph, "longProperty", new Long(Long.MIN_VALUE));
-        testProperty(graph, "longProperty", new Long(Long.MAX_VALUE));
 
         testProperty(graph, "doubleProperty", Double.MAX_VALUE);
         testProperty(graph, "doubleProperty", Double.MIN_VALUE);
-        testProperty(graph, "doubleProperty", new Double(Double.MAX_VALUE));
-        testProperty(graph, "doubleProperty", new Double(Double.MIN_VALUE));
 
         testProperty(graph, "floatProperty", Float.MAX_VALUE);
         testProperty(graph, "floatProperty", Float.MIN_VALUE);
-        testProperty(graph, "floatProperty", new Float(Float.MAX_VALUE));
-        testProperty(graph, "floatProperty", new Float(Float.MIN_VALUE));
 
         // enumerations - TypeCategory
         testProperty(graph, "typeCategoryProperty", TypeCategory.CLASS);
@@ -146,7 +133,7 @@ public class Titan0DatabaseTest {
     @Test
     public <V, E> void testMultiplicityOnePropertySupport() {
 
-        AtlasGraph<V, E> graph = (AtlasGraph<V, E>) getGraph();
+        AtlasGraph<V, E> graph = getGraph();
 
         AtlasVertex<V, E> vertex = graph.addVertex();
         vertex.setProperty("name", "Jeff");
@@ -182,7 +169,7 @@ public class Titan0DatabaseTest {
     @Test
     public <V, E> void testRemoveEdge() {
 
-        AtlasGraph<V, E> graph = (AtlasGraph<V, E>) getGraph();
+        AtlasGraph<V, E> graph = getGraph();
         AtlasVertex<V, E> v1 = graph.addVertex();
         AtlasVertex<V, E> v2 = graph.addVertex();
 
@@ -204,7 +191,7 @@ public class Titan0DatabaseTest {
     @Test
     public <V, E> void testRemoveVertex() {
 
-        AtlasGraph<V, E> graph = (AtlasGraph<V, E>) getGraph();
+        AtlasGraph<V, E> graph = getGraph();
 
         AtlasVertex<V, E> v1 = graph.addVertex();
 
@@ -218,7 +205,7 @@ public class Titan0DatabaseTest {
     @Test
     public <V, E> void testGetEdges() {
 
-        AtlasGraph<V, E> graph = (AtlasGraph<V, E>) getGraph();
+        AtlasGraph<V, E> graph = getGraph();
         AtlasVertex<V, E> v1 = graph.addVertex();
         AtlasVertex<V, E> v2 = graph.addVertex();
         AtlasVertex<V, E> v3 = graph.addVertex();
@@ -295,7 +282,7 @@ public class Titan0DatabaseTest {
 
         AtlasGraph<V, E> graph = getGraph();
         AtlasVertex<V, E> vertex = graph.addVertex();
-        vertex.setListProperty("colors", Arrays.asList(new String[] { "red", "blue", "green" }));
+        vertex.setListProperty("colors", Arrays.asList("red", "blue", "green"));
         List<String> colors = vertex.getListProperty("colors");
         assertTrue(colors.contains("red"));
         assertTrue(colors.contains("blue"));
@@ -418,7 +405,7 @@ public class Titan0DatabaseTest {
     }
 
     private static <T> List<T> toList(Iterable<? extends T> iterable) {
-        List<T> result = new ArrayList<T>();
+        List<T> result = new ArrayList<>();
         for (T item : iterable) {
             result.add(item);
         }

@@ -18,26 +18,20 @@
 
 package org.apache.atlas.web.listeners;
 
-import com.google.inject.Guice;
-import com.google.inject.Injector;
-import com.google.inject.Key;
-import com.google.inject.Module;
-import com.google.inject.Provider;
-import com.google.inject.Stage;
-import com.google.inject.TypeLiteral;
-import com.google.inject.servlet.GuiceServletContextListener;
-import com.sun.jersey.api.core.PackagesResourceConfig;
-import com.sun.jersey.guice.JerseyServletModule;
-import com.sun.jersey.guice.spi.container.servlet.GuiceContainer;
-import com.thinkaurelius.titan.core.TitanGraph;
-import com.tinkerpop.blueprints.Graph;
+import java.util.Enumeration;
+import java.util.HashMap;
+import java.util.Map;
+
+import javax.servlet.ServletContextEvent;
+
 import org.apache.atlas.ApplicationProperties;
 import org.apache.atlas.AtlasClient;
 import org.apache.atlas.AtlasException;
 import org.apache.atlas.RepositoryMetadataModule;
 import org.apache.atlas.ha.HAConfiguration;
 import org.apache.atlas.notification.NotificationModule;
-import org.apache.atlas.repository.graph.GraphProvider;
+import org.apache.atlas.repository.graph.AtlasGraphProvider;
+import org.apache.atlas.repository.graphdb.AtlasGraph;
 import org.apache.atlas.service.Services;
 import org.apache.atlas.web.filters.ActiveServerFilter;
 import org.apache.atlas.web.filters.AuditFilter;
@@ -48,9 +42,14 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.bridge.SLF4JBridgeHandler;
 
-import javax.servlet.ServletContextEvent;
-import java.util.HashMap;
-import java.util.Map;
+import com.google.inject.Guice;
+import com.google.inject.Injector;
+import com.google.inject.Module;
+import com.google.inject.Stage;
+import com.google.inject.servlet.GuiceServletContextListener;
+import com.sun.jersey.api.core.PackagesResourceConfig;
+import com.sun.jersey.guice.JerseyServletModule;
+import com.sun.jersey.guice.spi.container.servlet.GuiceContainer;
 
 public class GuiceServletConfig extends GuiceServletContextListener {
 
@@ -74,7 +73,7 @@ public class GuiceServletConfig extends GuiceServletContextListener {
             LoginProcessor loginProcessor = new LoginProcessor();
             loginProcessor.login();
 
-            injector = Guice.createInjector(Stage.PRODUCTION, getRepositoryModule(), new ActiveInstanceElectorModule(),
+            injector = Guice.createInjector(Stage.PRODUCTION,  getRepositoryModule(), new ActiveInstanceElectorModule(),
                     new NotificationModule(), new ServiceModule(), new JerseyServletModule() {
 
                         private Configuration appConfiguration = null;
@@ -95,13 +94,23 @@ public class GuiceServletConfig extends GuiceServletContextListener {
                             filter("/*").through(AuditFilter.class);
                             configureActiveServerFilterIfNecessary();
 
-                            String packages = getServletContext().getInitParameter(GUICE_CTX_PARAM);
+                            Map<String, String> initParams     = new HashMap<>();
+                            Enumeration<String> initParamNames = getServletContext().getInitParameterNames();
 
-                            LOG.info("Jersey loading from packages: " + packages);
+                            while (initParamNames.hasMoreElements()) {
+                                String initParamName  = initParamNames.nextElement();
+                                String initParamValue = getServletContext().getInitParameter(initParamName);
 
-                            Map<String, String> params = new HashMap<>();
-                            params.put(PackagesResourceConfig.PROPERTY_PACKAGES, packages);
-                            serve("/" + AtlasClient.BASE_URI + "*").with(GuiceContainer.class, params);
+                                if (GUICE_CTX_PARAM.equals(initParamName)) {
+                                    LOG.info("Jersey loading from packages: {}", initParamValue);
+
+                                    initParams.put(PackagesResourceConfig.PROPERTY_PACKAGES, initParamValue);
+                                } else {
+                                    initParams.put(initParamName, initParamValue);
+                                }
+                            }
+
+                            serve("/" + AtlasClient.BASE_URI + "*").with(GuiceContainer.class, initParams);
                         }
 
                         private void configureActiveServerFilterIfNecessary() {
@@ -159,10 +168,8 @@ public class GuiceServletConfig extends GuiceServletContextListener {
         if(injector != null) {
             //stop services
             stopServices();
-
-            TypeLiteral<GraphProvider<TitanGraph>> graphProviderType = new TypeLiteral<GraphProvider<TitanGraph>>() {};
-            Provider<GraphProvider<TitanGraph>> graphProvider = injector.getProvider(Key.get(graphProviderType));
-            final Graph graph = graphProvider.get().get();
+            
+            final AtlasGraph graph = AtlasGraphProvider.getGraphInstance();
 
             try {
                 graph.shutdown();

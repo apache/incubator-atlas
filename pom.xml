@@ -91,7 +91,7 @@
             <id>venkatesh</id>
             <name>Venkatesh Seetharam</name>
             <email>venkatesh@apache.org</email>
-            <timezone>-8</timezone>
+            <timezone>America/Los_Angeles</timezone>
             <roles>
                 <role>committer</role>
                 <role>PPMC</role>
@@ -103,7 +103,7 @@
             <id>rhbutani</id>
             <name>Harish Butani</name>
             <email>rhbutani@apache.org</email>
-            <timezone>-8</timezone>
+            <timezone>America/Los_Angeles</timezone>
             <roles>
                 <role>committer</role>
                 <role>PPMC</role>
@@ -115,7 +115,7 @@
             <id>shwethags</id>
             <name>Shwetha GS</name>
             <email>shwethags@apache.org</email>
-            <timezone>+05:30</timezone>
+            <timezone>Asia/Kolkata</timezone>
             <roles>
                 <role>committer</role>
                 <role>PPMC</role>
@@ -127,7 +127,7 @@
             <id>jmaron</id>
             <name>Jon Maron</name>
             <email>jmaron@hortonworks.com</email>
-            <timezone>-5</timezone>
+            <timezone>America/New_York</timezone>
             <roles>
                 <role>committer</role>
                 <role>PPMC</role>
@@ -139,7 +139,7 @@
             <id>AAhn</id>
             <name>Andrew Ahn</name>
             <email>aahn@hortonworks.com</email>
-            <timezone>-8</timezone>
+            <timezone>America/Los_Angeles</timezone>
             <roles>
                 <role>committer</role>
                 <role>PPMC</role>
@@ -151,7 +151,7 @@
             <id>dkaspar</id>
             <name>David Kaspar</name>
             <email>dkaspar@merck.com</email>
-            <timezone>+1</timezone>
+            <timezone>Europe/Berlin</timezone>
             <roles>
                 <role>committer</role>
                 <role>PPMC</role>
@@ -163,7 +163,7 @@
             <id>ilasek</id>
             <name>Ivo Lasek</name>
             <email>ilasek@merck.com</email>
-            <timezone>+1</timezone>
+            <timezone>Europe/Berlin</timezone>
             <roles>
                 <role>committer</role>
                 <role>PPMC</role>
@@ -175,7 +175,7 @@
             <id>dfusaro</id>
             <name>Dennis Fusaro</name>
             <email>dfusaro@aetna.com</email>
-            <timezone>-5</timezone>
+            <timezone>America/New_York</timezone>
             <roles>
                 <role>committer</role>
                 <role>PPMC</role>
@@ -187,7 +187,7 @@
             <id>chyzer</id>
             <name>Chris Hyzer</name>
             <email>chyzer@aetna.com</email>
-            <timezone>-5</timezone>
+            <timezone>America/New_York</timezone>
             <roles>
                 <role>committer</role>
                 <role>PPMC</role>
@@ -199,7 +199,7 @@
             <id>dmarkwat</id>
             <name>Daniel Markwat</name>
             <email>dmarkwat@aetna.com</email>
-            <timezone>-5</timezone>
+            <timezone>America/New_York</timezone>
             <roles>
                 <role>committer</role>
                 <role>PPMC</role>
@@ -211,7 +211,7 @@
             <id>gsenia</id>
             <name>Greg Senia</name>
             <email>gsenia@aetna.com</email>
-            <timezone>-5</timezone>
+            <timezone>America/New_York</timezone>
             <roles>
                 <role>committer</role>
                 <role>PPMC</role>
@@ -223,7 +223,7 @@
             <id>james</id>
             <name>James Vollmer</name>
             <email>james@target.com</email>
-            <timezone>-6</timezone>
+            <timezone>America/Denver</timezone>
             <roles>
                 <role>committer</role>
                 <role>PPMC</role>
@@ -235,7 +235,7 @@
             <id>adossett</id>
             <name>Aaron Dossett</name>
             <email>adossett@target.com</email>
-            <timezone>-6</timezone>
+            <timezone>America/Denver</timezone>
             <roles>
                 <role>committer</role>
                 <role>PPMC</role>
@@ -247,7 +247,7 @@
             <id>mschussler</id>
             <name>Mitch Schussler</name>
             <email>mschussler@apache.org</email>
-            <timezone>-5</timezone>
+            <timezone>America/New_York</timezone>
             <roles>
                 <role>committer</role>
                 <role>PPMC</role>
@@ -259,7 +259,7 @@
             <id>vavasarala</id>
             <name>Viswanath Avasarala</name>
             <email>vavasarala@slb.com</email>
-            <timezone>-6</timezone>
+            <timezone>America/Denver</timezone>
             <roles>
                 <role>committer</role>
                 <role>PPMC</role>
@@ -271,7 +271,7 @@
             <id>avarma</id>
             <name>Anil Varma</name>
             <email>avarma@slb.com</email>
-            <timezone>-6</timezone>
+            <timezone>America/Denver</timezone>
             <roles>
                 <role>committer</role>
                 <role>PPMC</role>
@@ -283,7 +283,7 @@
             <id>bstortz</id>
             <name>Barbara Stortz</name>
             <email>bstortz@sap.com</email>
-            <timezone>-8</timezone>
+            <timezone>America/Los_Angeles</timezone>
             <roles>
                 <role>committer</role>
                 <role>PPMC</role>
@@ -295,7 +295,7 @@
             <id>sriksun</id>
             <name>Srikanth Sundarrajan</name>
             <email>sriksun@apache.org</email>
-            <timezone>+05:30</timezone>
+            <timezone>Asia/Kolkata</timezone>
             <roles>
                 <role>committer</role>
                 <role>PPMC</role>
@@ -307,7 +307,7 @@
             <id>ssuresh</id>
             <name>Suresh Srinivas</name>
             <email>ssuresh@apache.org</email>
-            <timezone>-8</timezone>
+            <timezone>America/Los_Angeles</timezone>
             <roles>
                 <role>committer</role>
                 <role>PPMC</role>
@@ -319,7 +319,7 @@
             <id>vranganathan</id>
             <name>Venkat Ranganathan</name>
             <email>venkatrangan@apache.org</email>
-            <timezone>-8</timezone>
+            <timezone>America/Los_Angeles</timezone>
             <roles>
                 <role>committer</role>
                 <role>PPMC</role>
@@ -331,7 +331,7 @@
             <id>sumasai</id>
             <name>Suma Shivaprasad</name>
             <email>sumasai@apache.org</email>
-            <timezone>-8</timezone>
+            <timezone>America/Los_Angeles</timezone>
             <roles>
                 <role>committer</role>
                 <role>PPMC</role>
@@ -343,7 +343,7 @@
             <id>yhemanth</id>
             <name>Hemanth Yamijala</name>
             <email>yhemanth@apache.org</email>
-            <timezone>+05:30</timezone>
+            <timezone>Asia/Kolkata</timezone>
             <roles>
                 <role>committer</role>
                 <role>PPMC</role>
@@ -355,18 +355,17 @@
             <id>kbhatt</id>
             <name>Keval Bhatt</name>
             <email>kbhatt@apache.org</email>
-            <timezone>+05:30</timezone>
+            <timezone>Asia/Kolkata</timezone>
             <roles>
                 <role>committer</role>
             </roles>
             <organization>Freestone Infotech</organization>
-            <!--<organizationUrl>http://www.hortonworks.com</organizationUrl>-->
         </developer>
         <developer>
             <id>dkantor</id>
             <name>Dave Kantor</name>
             <email>dkantor@apache.org</email>
-            <timezone>-5</timezone>
+            <timezone>America/New_York</timezone>
             <roles>
                 <role>committer</role>
             </roles>
@@ -377,11 +376,51 @@
             <id>darshankumar</id>
             <name>Darshan Kumar</name>
             <email>darshankumar@apache.org</email>
-            <timezone>+05:30</timezone>
+            <timezone>Asia/Kolkata</timezone>
             <roles>
                 <role>committer</role>
             </roles>
             <organization>MPR</organization>
+        </developer>
+        <developer>
+            <id>tbeerbower</id>
+            <name>Tom Beerbower</name>
+            <email>tbeerbower@apache.org</email>
+            <timezone>America/New_York</timezone>
+            <roles>
+                <role>committer</role>
+            </roles>
+            <organization></organization>
+        </developer>
+        <developer>
+            <id>madhan</id>
+            <name>Madhan Neethiraj</name>
+            <email>madhan@apache.org</email>
+            <timezone>America/Los_Angeles</timezone>
+            <roles>
+                <role>committer</role>
+            </roles>
+            <organization></organization>
+        </developer>
+        <developer>
+            <id>svimal2106</id>
+            <name>Vimal Sharma</name>
+            <email>svimal2106@apache.org</email>
+            <timezone>Asia/Kolkata</timezone>
+            <roles>
+                <role>committer</role>
+            </roles>
+            <organization></organization>
+        </developer>
+        <developer>
+            <id>jnhagelberg</id>
+            <name>Jeffrey Hagelberg</name>
+            <email>jnhagelberg@apache.org</email>
+            <timezone>America/New_York</timezone>
+            <roles>
+                <role>committer</role>
+            </roles>
+            <organization>IBM Corporation</organization>
             <!--<organizationUrl>http://www.ibm.com</organizationUrl>-->
         </developer>
     </developers>
@@ -393,41 +432,45 @@
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
         <node.version>v0.10.30</node.version>
         <node-for-v2.version>v4.4.2</node-for-v2.version>
-        <slf4j.version>1.7.7</slf4j.version>
+        <slf4j.version>1.7.21</slf4j.version>
         <jetty.version>9.2.12.v20150709</jetty.version>
         <jersey.version>1.19</jersey.version>
-        <jackson.version>1.8.3</jackson.version>
         <tinkerpop.version>2.6.0</tinkerpop.version>
         <titan.version>0.5.4</titan.version>
         <hadoop.version>2.7.1</hadoop.version>
         <hbase.version>1.1.2</hbase.version>
         <solr.version>5.5.1</solr.version>
         <kafka.version>0.10.0.0</kafka.version>
+        <curator.version>2.11.0</curator.version>
+        <zookeeper.version>3.4.6</zookeeper.version>
+
         <!-- scala versions -->
-        <scala.version>2.10.4</scala.version>
-        <scala.binary.version>2.10</scala.binary.version>
+        <scala.version>2.11.8</scala.version>
+        <scala.binary.version>2.11</scala.binary.version>
         <scala.macros.version>2.0.1</scala.macros.version>
         <json.version>3.2.11</json.version>
         <log4j.version>1.2.17</log4j.version>
         <akka.version>2.3.7</akka.version>
         <spray.version>1.3.1</spray.version>
         <gson.version>2.5</gson.version>
-        <guava.version>14.0</guava.version>
         <fastutil.version>6.5.16</fastutil.version>
-        <guice.version>4.0</guice.version>
+        <guice.version>4.1.0</guice.version>
         <spring.version>3.1.3.RELEASE</spring.version>
         <spring.security.version>3.1.3.RELEASE</spring.security.version>
         <spring-ldap-core.version>1.3.1.RELEASE</spring-ldap-core.version>
         <javax.servlet.version>3.1.0</javax.servlet.version>
+        <guava.version>18.0</guava.version>
+
         <!-- Needed for hooks -->
         <aopalliance.version>1.0</aopalliance.version>
+        <codehaus.jackson.version>1.9.13</codehaus.jackson.version>
         <commons-conf.version>1.10</commons-conf.version>
         <commons-collections.version>3.2.2</commons-collections.version>
         <commons-logging.version>1.1.3</commons-logging.version>
         <commons-lang.version>2.6</commons-lang.version>
         <javax-inject.version>1</javax-inject.version>
         <jettison.version>1.3.7</jettison.version>
-        <paranamer.version>2.3</paranamer.version>
+        <paranamer.version>2.7</paranamer.version>
         <zkclient.version>0.8</zkclient.version>
 
         <PermGen>64m</PermGen>
@@ -446,10 +489,25 @@
         <titan.storage.backend>berkeleyje</titan.storage.backend>
         <titan.index.backend>elasticsearch</titan.index.backend>
         <entity.repository.impl>org.apache.atlas.repository.audit.InMemoryEntityAuditRepository</entity.repository.impl>
+	    <graphdb.backend.impl>org.apache.atlas.repository.graphdb.titan0.Titan0GraphDatabase</graphdb.backend.impl>
         <atlas.surefire.options></atlas.surefire.options>
+
+        <aspectj.runtime.version>1.8.7</aspectj.runtime.version>
+        <aspectj.skip>true</aspectj.skip>
     </properties>
 
     <profiles>
+        <!-- Turn on this profile to instrument atlas server to collect performance metrics -->
+        <profile>
+            <id>perf</id>
+            <activation>
+                <activeByDefault>false</activeByDefault>
+            </activation>
+            <properties>
+                <aspectj.skip>false</aspectj.skip>
+            </properties>
+        </profile>
+
         <!-- Turning on this profile affects only tests and does not affect packaging -->
         <profile>
             <id>distributed</id>
@@ -493,12 +551,15 @@
     </profiles>
 
     <modules>
+        <module>intg</module>
         <module>common</module>
         <module>typesystem</module>
         <module>server-api</module>
         <module>notification</module>
         <module>client</module>
         <module>graphdb</module>
+        <module>shaded/hbase-client-shaded</module>
+        <module>shaded/hbase-server-shaded</module>
         <module>repository</module>
         <module>authorization</module>
         <module>catalog</module>
@@ -518,6 +579,7 @@
         <module>addons/storm-bridge</module>
 	
         <module>distro</module>
+        <module>build-tools</module>
     </modules>
 
     <repositories>
@@ -571,6 +633,18 @@
 
     <dependencyManagement>
         <dependencies>
+            <!-- AOP dependencies. -->
+            <dependency>
+                <groupId>org.aspectj</groupId>
+                <artifactId>aspectjrt</artifactId>
+                <version>${aspectj.runtime.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.aspectj</groupId>
+                <artifactId>aspectjtools</artifactId>
+                <version>${aspectj.runtime.version}</version>
+            </dependency>
+
             <dependency>
                 <groupId>org.eclipse.jetty</groupId>
                 <artifactId>jetty-jsp</artifactId>
@@ -671,6 +745,10 @@
                         <groupId>commons-httpclient</groupId>
                         <artifactId>*</artifactId>
                     </exclusion>
+                    <exclusion>
+                        <groupId>com.google.guava</groupId>
+                        <artifactId>guava</artifactId>
+                    </exclusion>
                 </exclusions>
             </dependency>
 
@@ -690,6 +768,10 @@
                     <exclusion>
                         <groupId>org.mortbay.jetty</groupId>
                         <artifactId>*</artifactId>
+                    </exclusion>
+                    <exclusion>
+                        <groupId>com.google.guava</groupId>
+                        <artifactId>guava</artifactId>
                     </exclusion>
                 </exclusions>
             </dependency>
@@ -725,6 +807,30 @@
                 <scope>test</scope>
             </dependency>
 
+            <!-- Zookeeper, curator -->
+            <dependency>
+                <groupId>org.apache.curator</groupId>
+                <artifactId>curator-framework</artifactId>
+                <version>${curator.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>org.apache.curator</groupId>
+                <artifactId>curator-client</artifactId>
+                <version>${curator.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>org.apache.curator</groupId>
+                <artifactId>curator-recipes</artifactId>
+                <version>${curator.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>org.apache.zookeeper</groupId>
+                <artifactId>zookeeper</artifactId>
+                <version>${zookeeper.version}</version>
+            </dependency>
             <!-- commons -->
             <dependency>
                 <groupId>commons-configuration</groupId>
@@ -761,6 +867,12 @@
                 <groupId>com.google.inject</groupId>
                 <artifactId>guice</artifactId>
                 <version>${guice.version}</version>
+                <exclusions>
+                    <exclusion>
+                        <groupId>com.google.guava</groupId>
+                        <artifactId>guava</artifactId>
+                    </exclusion>
+                </exclusions>
             </dependency>
 
             <dependency>
@@ -841,13 +953,13 @@
             <dependency>
                 <groupId>org.codehaus.jackson</groupId>
                 <artifactId>jackson-core-asl</artifactId>
-                <version>${jackson.version}</version>
+                <version>${codehaus.jackson.version}</version>
             </dependency>
 
             <dependency>
                 <groupId>org.codehaus.jackson</groupId>
                 <artifactId>jackson-mapper-asl</artifactId>
-                <version>${jackson.version}</version>
+                <version>${codehaus.jackson.version}</version>
             </dependency>
 
             <dependency>
@@ -890,7 +1002,58 @@
             </dependency>
 
             <!-- Graph DB -->
-            
+            <dependency>
+                <groupId>com.tinkerpop.blueprints</groupId>
+                <artifactId>blueprints-core</artifactId>
+                <version>${tinkerpop.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>com.thinkaurelius.titan</groupId>
+                <artifactId>titan-core</artifactId>
+                <version>${titan.version}</version>
+                <exclusions>
+                    <!-- rexster does not work with servlet-api -->
+                    <exclusion>
+                        <groupId>com.tinkerpop.rexster</groupId>
+                        <artifactId>rexster-core</artifactId>
+                    </exclusion>
+                    <exclusion>
+                        <groupId>com.tinkerpop.rexster</groupId>
+                        <artifactId>rexster-server</artifactId>
+                    </exclusion>
+                    <!-- asm 4.0 does not work with jersey asm 3.1 -->
+                    <exclusion>
+                        <groupId>com.tinkerpop</groupId>
+                        <artifactId>frames</artifactId>
+                    </exclusion>
+                    <exclusion>
+                        <groupId>com.esotericsoftware.reflectasm</groupId>
+                        <artifactId>reflectasm</artifactId>
+                    </exclusion>
+                    <exclusion>
+                        <groupId>org.ow2.asm</groupId>
+                        <artifactId>asm</artifactId>
+                    </exclusion>
+                    <exclusion> <!-- GPL license imported from ganglia -->
+                        <groupId>org.acplt</groupId>
+                        <artifactId>oncrpc</artifactId>
+                    </exclusion>
+                </exclusions>
+            </dependency>
+
+            <dependency>
+                <groupId>com.thinkaurelius.titan</groupId>
+                <artifactId>titan-berkeleyje</artifactId>
+                <version>${titan.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>com.thinkaurelius.titan</groupId>
+                <artifactId>titan-hbase</artifactId>
+                <version>${titan.version}</version>
+            </dependency>
+
             <dependency>
                 <groupId>org.apache.hbase</groupId>
                 <artifactId>hbase-client</artifactId>
@@ -924,14 +1087,12 @@
                 <artifactId>hbase-server</artifactId>
                 <version>${hbase.version}</version>
                 <classifier>tests</classifier>
-                <scope>test</scope>
             </dependency>
 
             <dependency>
                 <groupId>org.apache.hbase</groupId>
                 <artifactId>hbase-server</artifactId>
                 <version>${hbase.version}</version>
-                <scope>test</scope>
                 <exclusions>
                     <exclusion>
                         <groupId>org.mortbay.jetty</groupId>
@@ -991,6 +1152,20 @@
             <!--  atlas modules -->
             <dependency>
                 <groupId>org.apache.atlas</groupId>
+                <artifactId>atlas-intg</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>org.apache.atlas</groupId>
+                <artifactId>atlas-intg</artifactId>
+                <version>${project.version}</version>
+                <classifier>tests</classifier>
+                <scope>test</scope>
+            </dependency>
+
+            <dependency>
+                <groupId>org.apache.atlas</groupId>
                 <artifactId>atlas-typesystem</artifactId>
                 <version>${project.version}</version>
             </dependency>
@@ -1006,12 +1181,6 @@
             <dependency>
                 <groupId>org.apache.atlas</groupId>
                 <artifactId>atlas-graphdb-api</artifactId>
-                <version>${project.version}</version>
-            </dependency>
-
-            <dependency>
-                <groupId>org.apache.atlas</groupId>
-                <artifactId>atlas-graphdb-titan0</artifactId>
                 <version>${project.version}</version>
             </dependency>
 
@@ -1066,6 +1235,34 @@
                 <version>${project.version}</version>
                 <type>war</type>
             </dependency>
+
+            <dependency>
+                <groupId>org.apache.atlas</groupId>
+                <artifactId>atlas-hbase-client-shaded</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>org.apache.atlas</groupId>
+                <artifactId>atlas-hbase-server-shaded</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>org.apache.atlas</groupId>
+                <artifactId>atlas-buildtools</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+
+    	    <!-- use titan 0.5.4 by default -->
+            <dependency>
+                <groupId>org.apache.atlas</groupId>
+                <artifactId>atlas-graphdb-impls</artifactId>
+                <version>${project.version}</version>
+                <type>pom</type>
+		        <!-- exclusions should be added here for all of the non-titan0 implementations -->
+                <scope>test</scope>
+	        </dependency>
 
             <dependency>
                 <groupId>org.apache.atlas</groupId>
@@ -1142,12 +1339,6 @@
 
             <dependency>
                 <groupId>org.scala-lang</groupId>
-                <artifactId>jline</artifactId>
-                <version>${scala.version}</version>
-            </dependency>
-
-            <dependency>
-                <groupId>org.scala-lang</groupId>
                 <artifactId>scala-library</artifactId>
                 <version>${scala.version}</version>
             </dependency>
@@ -1165,20 +1356,14 @@
             </dependency>
 
             <dependency>
-                <groupId>org.scalamacros</groupId>
-                <artifactId>quasiquotes_${scala.binary.version}</artifactId>
-                <version>${scala.macros.version}</version>
-            </dependency>
-
-            <dependency>
                 <groupId>org.json4s</groupId>
-                <artifactId>json4s-native_2.10</artifactId>
+                <artifactId>json4s-native_${scala.binary.version}</artifactId>
                 <version>${json.version}</version>
             </dependency>
 
             <dependency>
                 <groupId>com.github.nscala-time</groupId>
-                <artifactId>nscala-time_2.10</artifactId>
+                <artifactId>nscala-time_${scala.binary.version}</artifactId>
                 <version>1.6.0</version>
             </dependency>
 
@@ -1190,19 +1375,19 @@
 
             <dependency>
                 <groupId>com.typesafe.akka</groupId>
-                <artifactId>akka-actor_2.10</artifactId>
+                <artifactId>akka-actor_${scala.binary.version}</artifactId>
                 <version>${akka.version}</version>
             </dependency>
 
             <dependency>
                 <groupId>com.typesafe.akka</groupId>
-                <artifactId>akka-testkit_2.10</artifactId>
+                <artifactId>akka-testkit_${scala.binary.version}</artifactId>
                 <version>${akka.version}</version>
             </dependency>
 
             <dependency>
                 <groupId>com.typesafe.akka</groupId>
-                <artifactId>akka-slf4j_2.10</artifactId>
+                <artifactId>akka-slf4j_${scala.binary.version}</artifactId>
                 <version>${akka.version}</version>
             </dependency>
 
@@ -1228,12 +1413,6 @@
                 <groupId>io.spray</groupId>
                 <artifactId>spray-testkit</artifactId>
                 <version>${spray.version}</version>
-            </dependency>
-
-            <dependency>
-                <groupId>com.google.guava</groupId>
-                <artifactId>guava</artifactId>
-                <version>${guava.version}</version>
             </dependency>
 
             <dependency>
@@ -1325,6 +1504,12 @@
                 <artifactId>atlas-plugin-classloader</artifactId>
                 <version>${project.version}</version>
             </dependency>
+
+            <dependency>
+                <groupId>com.101tec</groupId>
+                <artifactId>zkclient</artifactId>
+                <version>${zkclient.version}</version>
+            </dependency>
         </dependencies>
     </dependencyManagement>
 
@@ -1404,7 +1589,7 @@
                 <plugin>
                     <groupId>com.github.eirslett</groupId>
                     <artifactId>frontend-maven-plugin</artifactId>
-                    <version>0.0.29</version>
+                    <version>1.0</version>
                 </plugin>
 
                 <plugin>
@@ -1477,68 +1662,19 @@
                     </configuration>
                 </plugin>
 
-                <plugin>
-                    <groupId>net.alchim31.maven</groupId>
-                    <artifactId>scala-maven-plugin</artifactId>
-                    <version>3.2.0</version>
-                    <executions>
-                        <execution>
-                            <id>scala-compile-first</id>
-                            <phase>process-resources</phase>
-                            <goals>
-                                <goal>compile</goal>
-                            </goals>
-                        </execution>
-                        <execution>
-                            <id>scala-test-compile-first</id>
-                            <phase>process-test-resources</phase>
-                            <goals>
-                                <goal>testCompile</goal>
-                            </goals>
-                        </execution>
-                    </executions>
-                    <configuration>
-                        <scalaVersion>${scala.version}</scalaVersion>
-                        <recompileMode>incremental</recompileMode>
-                        <useZincServer>true</useZincServer>
-                        <source>1.7</source>
-                        <target>1.7</target>
-                        <args>
-                            <arg>-unchecked</arg>
-                            <arg>-deprecation</arg>
-                            <arg>-feature</arg>
-                        </args>
-                        <jvmArgs>
-                            <jvmArg>-Xmx512m</jvmArg>
-                            <jvmArg>-XX:MaxPermSize=128m</jvmArg>
-                        </jvmArgs>
-                        <!--
-                        <javacArgs>
-                            <javacArg>-source</javacArg>
-                            <javacArg>${java.version}</javacArg>
-                            <javacArg>-target</javacArg>
-                            <javacArg>${java.version}</javacArg>
-                        </javacArgs>
-                        -->
-                        <!-- The following plugin is required to use quasiquotes in Scala 2.10 and is used
-                             by Spark SQL for code generation. -->
-                        <!--<compilerPlugins>
-                            <compilerPlugin>
-                                <groupId>org.scalamacros</groupId>
-                                <artifactId>paradise_${scala.version}</artifactId>
-                                <version>${scala.macros.version}</version>
-                            </compilerPlugin>
-                        </compilerPlugins>-->
-                    </configuration>
-                </plugin>
-
-		<plugin>
+        		<plugin>
                     <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-remote-resources-plugin</artifactId>
                     <version>1.5</version>
                     <configuration>
                         <excludeGroupIds>org.restlet.jee</excludeGroupIds>                       
                     </configuration>
+                </plugin>
+
+                <plugin>
+                    <groupId>org.codehaus.mojo</groupId>
+                    <artifactId>aspectj-maven-plugin</artifactId>
+                    <version>1.8</version>
                 </plugin>
             </plugins>
         </pluginManagement>
@@ -1692,9 +1828,12 @@
                     <excludeSubProjects>true</excludeSubProjects>
                     <excludes>
                         <exclude>**/dependency-reduced-pom.xml</exclude>
+			            <exclude>**/javax.script.ScriptEngineFactory</exclude>
                         <exclude>.reviewboardrc</exclude>
                         <exclude>3party-licenses/**</exclude>
+                        <exclude>**/.cache</exclude>
                         <exclude>**/.cache-main</exclude>
+                        <exclude>**/.cache-tests</exclude>
                         <exclude>**/.checkstyle</exclude>
                         <exclude>*.txt</exclude>
                         <exclude>**/*.json</exclude>
@@ -1707,6 +1846,7 @@
                         <exclude>**/*.twiki</exclude>
                         <exclude>**/*.iml</exclude>
                         <exclude>**/*.json</exclude>
+                        <exclude>**/*.log</exclude>
                         <exclude>**/target/**</exclude>
                         <exclude>**/target*/**</exclude>
                         <exclude>**/build/**</exclude>
@@ -1729,7 +1869,7 @@
                         <exclude>**/users-credentials.properties</exclude>
                         <exclude>**/public/css/animate.min.css</exclude>
                         <exclude>**/public/css/bootstrap-sidebar.css</exclude>
-                        <exclude>**/public/js/require-handlebars-plugin/**</exclude>
+                        <exclude>**/public/js/external_lib/**</exclude>
                         <exclude>**/node_modules/**</exclude>
                         <!-- All the npm plugins are copied here, so exclude it -->
                         <exclude>**/public/js/libs/**</exclude>
@@ -1738,6 +1878,8 @@
                         <exclude>**/atlas.data/**</exclude>
                         <exclude>**/${sys:atlas.data}/**</exclude>
                         <exclude>**/policy-store.txt</exclude>
+                        <exclude>**/*rebel*.xml</exclude>
+                        <exclude>**/*rebel*.xml.bak</exclude>
                     </excludes>
                 </configuration>
                 <executions>
@@ -1754,6 +1896,13 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-checkstyle-plugin</artifactId>
+                <dependencies>
+                    <dependency>
+                        <groupId>org.apache.atlas</groupId>
+                        <artifactId>atlas-buildtools</artifactId>
+                        <version>${project.version}</version>
+                    </dependency>
+                </dependencies>
                 <executions>
                     <execution>
                         <id>checkstyle-check</id>
@@ -1763,11 +1912,8 @@
                         <phase>verify</phase>
                         <configuration>
                             <skip>${skipCheck}</skip>
-                            <consoleOutput>true</consoleOutput>
+                            <consoleOutput>false</consoleOutput>
                             <includeTestSourceDirectory>true</includeTestSourceDirectory>
-                            <configLocation>src/build/checkstyle.xml</configLocation>
-                            <headerLocation>src/build/checkstyle-java-header.txt</headerLocation>
-                            <suppressionsLocation>src/build/checkstyle-suppressions.xml</suppressionsLocation>
                             <suppressionsFileExpression>checkstyle.suppressions.file</suppressionsFileExpression>
                             <failOnViolation>${checkstyle.failOnViolation}</failOnViolation>
                         </configuration>

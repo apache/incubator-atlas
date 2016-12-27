@@ -21,7 +21,8 @@ define(['require',
     'hbs!tmpl/search/SearchLayoutView_tmpl',
     'collection/VTagList',
     'utils/Utils',
-], function(require, Backbone, SearchLayoutViewTmpl, VTagList, Utils) {
+    'utils/UrlLinks'
+], function(require, Backbone, SearchLayoutViewTmpl, VTagList, Utils, UrlLinks) {
     'use strict';
 
     var SearchLayoutView = Backbone.Marionette.LayoutView.extend(
@@ -41,7 +42,8 @@ define(['require',
                 searchBtn: '[data-id="searchBtn"]',
                 clearSearch: '[data-id="clearSearch"]',
                 typeLov: '[data-id="typeLOV"]',
-                refreshBtn: '[data-id="refreshBtn"]'
+                refreshBtn: '[data-id="refreshBtn"]',
+                createEntity: "[data-id='createEntity']",
             },
             /** ui events hash */
             events: function() {
@@ -62,6 +64,7 @@ define(['require',
                 events["click " + this.ui.clearSearch] = 'clearSearchData';
                 events["change " + this.ui.typeLov] = 'onChangeTypeList';
                 events["click " + this.ui.refreshBtn] = 'onRefreshButton';
+                events["click " + this.ui.createEntity] = 'onClickCreateEntity';
                 return events;
             },
             /**
@@ -71,6 +74,7 @@ define(['require',
             initialize: function(options) {
                 _.extend(this, _.pick(options, 'globalVent', 'value'));
                 this.typecollection = new VTagList([], {});
+                this.typecollection.url = UrlLinks.typesApiUrl();
                 this.type = "fulltext";
                 var param = Utils.getUrlState.getQueryParams();
                 this.query = {
@@ -104,7 +108,6 @@ define(['require',
                 this.ui.searchBtn.attr("disabled", "true");
             },
             fetchCollection: function(value) {
-                $.extend(this.typecollection.queryParams, { type: 'CLASS' });
                 this.typecollection.fetch({ reset: true });
             },
             onRefreshButton: function() {
@@ -118,10 +121,10 @@ define(['require',
                 this.ui.typeLov.empty();
                 var str = '<option></option>';
                 this.typecollection.fullCollection.comparator = function(model) {
-                    return model.get('tags').toLowerCase();
+                    return model.get('name').toLowerCase();
                 }
                 this.typecollection.fullCollection.sort().each(function(model) {
-                    str += '<option>' + model.get("tags") + '</option>';
+                    str += '<option>' + _.escape(model.get("name")) + '</option>';
                 });
                 that.ui.typeLov.html(str);
             },
@@ -246,7 +249,20 @@ define(['require',
                     mergeBrowserUrl: false,
                     trigger: true
                 });
-            }
+            },
+            onClickCreateEntity: function(e) {
+                var that = this;
+                $(e.currentTarget).blur();
+                require([
+                    'views/entity/CreateEntityLayoutView'
+                ], function(CreateEntityLayoutView) {
+                    var view = new CreateEntityLayoutView({
+                        callback: function() {
+                            that.fetchCollection();
+                        }
+                    });
+                });
+            },
         });
     return SearchLayoutView;
 });

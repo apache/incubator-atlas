@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-define(['require', 'utils/Utils', 'modules/Modal', 'utils/Messages', 'utils/Globals'], function(require, Utils, Modal, Messages, Globals) {
+define(['require', 'utils/Utils', 'modules/Modal', 'utils/Messages', 'utils/Enums'], function(require, Utils, Modal, Messages, Enums) {
     'use strict';
 
     var CommonViewFunction = {};
@@ -80,28 +80,28 @@ define(['require', 'utils/Utils', 'modules/Modal', 'utils/Messages', 'utils/Glob
                     success: function(data) {
                         var value = "",
                             deleteButton = "";
-                        if (data.definition.values.name) {
-                            value = data.definition.values.name;
-                        } else if (data.definition.values.qualifiedName) {
-                            value = data.definition.values.qualifiedName;
-                        } else if (data.definition.typeName) {
-                            value = data.definition.typeName;
-                        }
-                        var id = "";
-                        if (data.definition.id) {
-                            if (_.isObject(data.definition.id) && data.definition.id.id) {
-                                id = data.definition.id.id;
-                                if (Globals.entityStateReadOnly[data.definition.id.state]) {
-                                    deleteButton += '<button title="Deleted" class="btn btn-atlasAction btn-atlas deleteBtn"><i class="fa fa-trash"></i></button>';
-                                }
-                            } else {
-                                id = data.definition.id;
+
+                        if (data && data.attributes) {
+                            if (data.attributes.name) {
+                                value = data.attributes.name;
+                            } else if (data.attributes.qualifiedName) {
+                                value = data.attributes.qualifiedName;
+                            } else if (data.typeName) {
+                                value = data.typeName;
                             }
                         }
+                        var id = "";
+                        if (data.guid) {
+                            if (Enums.entityStateReadOnly[data.attributes.state]) {
+                                deleteButton += '<button title="Deleted" class="btn btn-atlasAction btn-atlas deleteBtn"><i class="fa fa-trash"></i></button>';
+                            }
+                            id = data.guid;
+
+                        }
                         if (value.length > 1) {
-                            scope.$('td div[data-id="' + id + '"]').html('<a href="#!/detailPage/' + id + '">' + value + '</a>');
+                            scope.$('td div[data-id="' + id + '"]').html('<a href="#!/detailPage/' + id + '">' + _.escape(value) + '</a>');
                         } else {
-                            scope.$('td div[data-id="' + id + '"]').html('<a href="#!/detailPage/' + id + '">' + id + '</a>');
+                            scope.$('td div[data-id="' + id + '"]').html('<a href="#!/detailPage/' + id + '">' + _.escape(id) + '</a>');
                         }
                         if (deleteButton.length) {
                             scope.$('td div[data-id="' + id + '"]').addClass('block readOnlyLink');
@@ -118,64 +118,57 @@ define(['require', 'utils/Utils', 'modules/Modal', 'utils/Messages', 'utils/Glob
                 });
             }
         _.keys(valueObject).map(function(key) {
+            key = _.escape(key)
             var keyValue = valueObject[key],
                 valueOfArray = [];
-            if (_.isArray(keyValue)) {
+            if (_.isArray(keyValue) || _.isObject(keyValue)) {
+                if (!_.isArray(keyValue) && _.isObject(keyValue)) {
+                    keyValue = [keyValue];
+                }
                 var subLink = "";
                 for (var i = 0; i < keyValue.length; i++) {
                     var inputOutputField = keyValue[i],
-                        id = undefined,
+                        id = inputOutputField.guid,
                         tempLink = "",
                         readOnly = false;
-                    if (inputOutputField['$id$']) {
-                        inputOutputField.id = inputOutputField['$id$'];
-                    }
-                    if (inputOutputField) {
-                        if (_.isObject(inputOutputField.id)) {
-                            id = inputOutputField.id.id;
-                            if (Globals.entityStateReadOnly[inputOutputField.id.state]) {
-                                readOnly = inputOutputField.id.state
-                            }
-                        } else if (inputOutputField.id) {
-                            id = inputOutputField.id;
-                        } else if (_.isString(inputOutputField) || _.isBoolean(inputOutputField) || _.isNumber(inputOutputField)) {
-                            if (inputOutputField.indexOf("$") == -1) {
-                                valueOfArray.push('<span>' + inputOutputField + '</span>');
-                            }
-                        } else if (_.isObject(inputOutputField)) {
-                            _.each(inputOutputField, function(objValue, objKey) {
-                                var value = objValue;
-                                if (objKey.indexOf("$") == -1) {
-                                    if (_.isObject(value)) {
-                                        value = JSON.stringify(value);
-                                    }
-                                    valueOfArray.push('<span>' + objKey + ':' + value + '</span>');
-                                }
-                            });
+                    if (_.isString(inputOutputField) || _.isBoolean(inputOutputField) || _.isNumber(inputOutputField)) {
+                        if (inputOutputField.indexOf("$") == -1) {
+                            valueOfArray.push('<span>' + _.escape(inputOutputField) + '</span>');
                         }
+                    } else if (_.isObject(inputOutputField) && !inputOutputField.attributes && !id) {
+                        _.each(inputOutputField, function(objValue, objKey) {
+                            var value = objValue;
+                            if (objKey.indexOf("$") == -1) {
+                                if (_.isObject(value)) {
+                                    value = JSON.stringify(value);
+                                }
+                                valueOfArray.push('<span>' + _.escape(objKey) + ':' + _.escape(value) + '</span>');
+                            }
+                        });
                     }
 
-                    if (id) {
-                        if (inputOutputField.values) {
-                            if (inputOutputField.values.name) {
-                                tempLink += '<a href="#!/detailPage/' + id + '">' + inputOutputField.values.name + '</a>'
-                            } else if (inputOutputField.values.qualifiedName) {
-                                tempLink += '<a href="#!/detailPage/' + id + '">' + inputOutputField.values.qualifiedName + '</a>'
+                    if (id && inputOutputField) {
+                        if (inputOutputField.attributes) {
+                            if (inputOutputField.attributes.name) {
+                                tempLink += '<a href="#!/detailPage/' + id + '">' + _.escape(inputOutputField.attributes.name) + '</a>'
+                            } else if (inputOutputField.attributes.qualifiedName) {
+                                tempLink += '<a href="#!/detailPage/' + id + '">' + _.escape(inputOutputField.attributes.qualifiedName) + '</a>'
                             } else if (inputOutputField.typeName) {
-                                tempLink += '<a href="#!/detailPage/' + id + '">' + inputOutputField.typeName + '</a>'
+                                tempLink += '<a href="#!/detailPage/' + id + '">' + _.escape(inputOutputField.typeName) + '</a>'
                             } else {
                                 tempLink += '<a href="#!/detailPage/' + id + '">' + id + '</a>'
                             }
                         } else if (inputOutputField.name) {
-                            tempLink += '<a href="#!/detailPage/' + id + '">' + inputOutputField.name + '</a>';
+                            tempLink += '<a href="#!/detailPage/' + id + '">' + _.escape(inputOutputField.name) + '</a>';
                         } else if (inputOutputField.qualifiedName) {
-                            tempLink += '<a href="#!/detailPage/' + id + '">' + inputOutputField.qualifiedName + '</a>'
+                            tempLink += '<a href="#!/detailPage/' + id + '">' + _.escape(inputOutputField.qualifiedName) + '</a>'
                         } else {
                             var fetch = true;
                             fetchInputOutputValue(id);
                             tempLink += '<div data-id="' + id + '"></div>';
                         }
                     }
+
                     if (readOnly) {
                         if (!fetch) {
                             tempLink += '<button title="Deleted" class="btn btn-atlasAction btn-atlas deleteBtn"><i class="fa fa-trash"></i></button>';
@@ -199,99 +192,7 @@ define(['require', 'utils/Utils', 'modules/Modal', 'utils/Messages', 'utils/Glob
                 if (searchTable) {
                     table = subLink;
                 } else {
-                    table += '<tr><td>' + key + '</td><td>' + subLink + '</td></tr>';
-                }
-            } else if (_.isObject(keyValue)) {
-                var id = undefined,
-                    tempLink = "",
-                    readOnly = false;
-                if (keyValue['$id$']) {
-                    keyValue.id = keyValue['$id$'];
-                }
-                if (_.isObject(keyValue.id)) {
-                    id = keyValue.id.id;
-                    if (Globals.entityStateReadOnly[keyValue.id.state]) {
-                        readOnly = keyValue.id.state
-                    }
-                } else {
-                    id = keyValue.id;
-                }
-                if (id) {
-                    if (keyValue.values) {
-                        if (keyValue.values.name) {
-                            tempLink += '<a href="#!/detailPage/' + id + '">' + keyValue.values.name + '</a>';
-                        } else if (keyValue.values.qualifiedName) {
-                            tempLink += '<a href="#!/detailPage/' + id + '">' + keyValue.values.qualifiedName + '</a>'
-                        } else if (keyValue.typeName) {
-                            tempLink += '<a href="#!/detailPage/' + id + '">' + keyValue.typeName + '</a>'
-                        } else {
-                            tempLink += '<a href="#!/detailPage/' + id + '">' + id + '</a>';
-                        }
-                    } else if (keyValue.name) {
-                        tempLink += '<a href="#!/detailPage/' + id + '">' + keyValue.name + '</a>';
-                    } else if (keyValue.qualifiedName) {
-                        tempLink += '<a href="#!/detailPage/' + id + '">' + keyValue.qualifiedName + '</a>'
-                    } else {
-                        var fetch = true;
-                        fetchInputOutputValue(id);
-                        tempLink += '<div data-id="' + id + '"></div>';
-                    }
-                    if (readOnly) {
-                        if (!fetch) {
-                            tempLink += '<button title="Deleted" class="btn btn-atlasAction btn-atlas deleteBtn"><i class="fa fa-trash"></i></button>';
-                        }
-
-                        if (searchTable) {
-                            if (!fetch) {
-                                table = '<div class="block readOnlyLink">' + tempLink + '</div>';
-                            } else {
-                                table = tempLink;
-                            }
-                        } else {
-                            if (!fetch) {
-                                table += '<tr><td>' + key + '</td><td><div class="block readOnlyLink">' + tempLink + '</div></td></tr>';
-                            } else {
-                                table += '<tr><td>' + key + '</td><td>' + tempLink + '</td></tr>';
-                            }
-                        }
-                    } else {
-                        if (searchTable) {
-                            table = tempLink;
-                        } else {
-                            table += '<tr><td>' + key + '</td><td>' + tempLink + '</td></tr>';
-                        }
-                    }
-                } else {
-                    var stringArr = [];
-                    _.each(keyValue, function(val, key) {
-                        var value = "";
-                        if (_.isObject(val)) {
-                            value = JSON.stringify(val);
-                        } else {
-                            value = val;
-                        }
-                        var attrName = "<span>" + key + " : " + value + "</span>";
-                        stringArr.push(attrName);
-                    });
-                    var jointValues = stringArr.join(", ");
-                    if (jointValues.length) {
-                        tempLink += '<div>' + jointValues + '</div>';
-                    }
-                    if (readOnly) {
-                        tempLink += '<button title="Deleted" class="btn btn-atlasAction btn-atlas deleteBtn"><i class="fa fa-trash"></i></button>';
-                        if (searchTable) {
-                            table = '<div class="block readOnlyLink">' + tempLink + '</div>';
-                        } else {
-                            table += '<tr><td>' + key + '</td><td><div class="block readOnlyLink">' + tempLink + '</div></td></tr>';
-                        }
-
-                    } else {
-                        if (searchTable) {
-                            table = tempLink;
-                        } else {
-                            table += '<tr><td>' + key + '</td><td>' + tempLink + '</td></tr>';
-                        }
-                    }
+                    table += '<tr><td>' + key + '</td><td>' + _.escape(subLink) + '</td></tr>';
                 }
             } else {
                 if (key.indexOf("Time") !== -1 || key == "retention") {
@@ -308,7 +209,7 @@ define(['require', 'utils/Utils', 'modules/Modal', 'utils/Messages', 'utils/Glob
                             table = valueObject[key];
                         }
                     } else {
-                        table += '<tr><td>' + key + '</td><td>' + valueObject[key] + '</td></tr>';
+                        table += '<tr><td>' + key + '</td><td>' + _.escape(valueObject[key]) + '</td></tr>';
                     }
                 }
             }
@@ -336,13 +237,13 @@ define(['require', 'utils/Utils', 'modules/Modal', 'utils/Messages', 'utils/Glob
                 if (i == 0) {
                     href = splitUrlWithoutTerm[i];
                     urlList.push({
-                        value: splitUrlWithoutTerm[i],
+                        value: _.escape(splitUrlWithoutTerm[i]),
                         href: href
                     });
                 } else {
                     href += "/terms/" + splitUrlWithoutTerm[i];
                     urlList.push({
-                        value: splitUrlWithoutTerm[i],
+                        value: _.escape(splitUrlWithoutTerm[i]),
                         href: href
                     });
                 };
@@ -354,7 +255,7 @@ define(['require', 'utils/Utils', 'modules/Modal', 'utils/Messages', 'utils/Glob
         var li = "";
         if (options.urlList) {
             _.each(options.urlList, function(object) {
-                li += '<li><a href="javascript:void(0)" class="link" data-href="/api/atlas/v1/taxonomies/' + object.href + '">' + object.value + '</a></li>';
+                li += '<li><a class="link" href="#!/taxonomy/detailCatalog/api/atlas/v1/taxonomies/' + object.href + '?load=true">' + _.escape(object.value) + '</a></li>';
             });
         }
         if (options.scope) {
@@ -363,36 +264,36 @@ define(['require', 'utils/Utils', 'modules/Modal', 'utils/Messages', 'utils/Glob
             options.scope.asBreadcrumbs({
                 namespace: 'breadcrumb',
                 overflow: "left",
-                dropicon: "fa fa-ellipsis-h",
                 responsive: false,
-                dropdown: function() {
-                    return '<div class=\"dropdown\">' +
-                        '<a href=\"javascript:void(0);\" class=\"' + this.namespace + '-toggle\" data-toggle=\"dropdown\"><i class=\"' + this.dropicon + '\"</i></a>' +
-                        '<ul class=\"' + this.namespace + '-menu dropdown-menu popover popoverTerm bottom arrowPosition \" ><div class="arrow"></div></ul>' +
-                        '</div>';
-                },
-                dropdownContent: function(a) {
-                    return '<li><a class="link" href="javascript:void(0)" data-href="' + a.find('a').data('href') + '" class="dropdown-item">' + a.text() + "</a></li>";
+                toggleIconClass: 'fa fa-ellipsis-h',
+                dropdown: function(classes) {
+                    var dropdownClass = 'dropdown';
+                    var dropdownMenuClass = 'dropdown-menu popover popoverTerm bottom arrowPosition';
+                    if (this.options.overflow === 'right') {
+                        dropdownMenuClass += ' dropdown-menu-right';
+                    }
+
+                    return '<li class="' + dropdownClass + ' ' + classes.dropdownClass + '">' +
+                        '<a href="javascript:void(0);" class="' + classes.toggleClass + '" data-toggle="dropdown">' +
+                        '<i class="' + classes.toggleIconClass + '"></i>' +
+                        '</a>' +
+                        '<ul class="' + dropdownMenuClass + ' ' + classes.dropdownMenuClass + '">' +
+                        '<div class="arrow"></div>' +
+                        '</ul>' +
+                        '</li>';
                 }
             });
         }
-        options.scope.find('li a.link').click(function() {
-            Utils.setUrl({
-                url: "#!/taxonomy/detailCatalog" + $(this).data('href') + "?load=true",
-                mergeBrowserUrl: false,
-                trigger: true,
-                updateTabState: function() {
-                    return { taxonomyUrl: this.url, stateChanged: false };
-                }
-            });
-        });
     }
     CommonViewFunction.termTableBreadcrumbMaker = function(model) {
+        if (!model) {
+            return "";
+        }
         var traits = model.get('$traits$'),
             url = "",
             deleteHtml = "",
             html = "",
-            id = model.get('$id$').id,
+            id = model.get('$id$').id || model.get('$id$'),
             terms = [];
         _.keys(traits).map(function(key) {
             if (traits[key]) {
@@ -400,8 +301,8 @@ define(['require', 'utils/Utils', 'modules/Modal', 'utils/Messages', 'utils/Glob
             }
             if (tagName.term) {
                 terms.push({
-                    deleteHtml: '<a class="pull-left" title="Remove Term"><i class="fa fa-trash" data-id="tagClick" data-type="term" data-assetname="' + model.get("name") + '" data-name="' + tagName.fullName + '" data-guid="' + model.get('$id$').id + '" ></i></a>',
-                    url: tagName.fullName.split(".").join("/"),
+                    deleteHtml: '<a class="pull-left" title="Remove Term"><i class="fa fa-trash" data-id="tagClick" data-type="term" data-assetname="' + _.escape(model.get("name")) + '" data-name="' + tagName.fullName + '" data-guid="' + (model.get('$id$').id || model.get('$id$')) + '" ></i></a>',
+                    url: _.unescape(tagName.fullName).split(".").join("/"),
                     name: tagName.fullName
                 });
             }
@@ -412,13 +313,13 @@ define(['require', 'utils/Utils', 'modules/Modal', 'utils/Messages', 'utils/Glob
                 className += "showHideDiv hide";
             }
             obj['valueUrl'] = CommonViewFunction.breadcrumbUrlMaker(obj.url);
-            html += '<div class="' + className + '" dataterm-name="' + obj.name + '"><div class="liContent"></div>' + obj.deleteHtml + '</div>';
+            html += '<div class="' + className + '" dataterm-name="' + _.escape(obj.name) + '"><div class="liContent"></div>' + obj.deleteHtml + '</div>';
         })
         if (terms.length > 1) {
             html += '<div><a  href="javascript:void(0)" data-id="showMoreLessTerm" class="inputTag inputTagGreen"><span>Show More </span><i class="fa fa-angle-right"></i></a></div>'
         }
         if (model.get('$id$')) {
-            html += '<div><a href="javascript:void(0)" class="inputAssignTag" data-id="addTerm" data-guid="' + model.get('$id$').id + '"><i class="fa fa-folder-o"></i>' + " " + 'Assign Term</a></div>'
+            html += '<div><a href="javascript:void(0)" class="inputAssignTag" data-id="addTerm" data-guid="' + (model.get('$id$').id || model.get('$id$')) + '"><i class="fa fa-folder-o"></i>' + " " + 'Assign Term</a></div>'
         } else {
             html += '<div><a href="javascript:void(0)" class="inputAssignTag" data-id="addTerm"><i class="fa fa-folder-o"></i>' + " " + 'Assign Term</a></div>'
         }
@@ -441,15 +342,15 @@ define(['require', 'utils/Utils', 'modules/Modal', 'utils/Messages', 'utils/Glob
             var className = "inputTag";
             if (tagName.tag) {
                 if (count >= 1) {
-                    popTag += '<a class="' + className + '" data-id="tagClick"><span class="inputValue">' + tagName.fullName + '</span><i class="fa fa-times" data-id="delete"  data-assetname="' + model.get("name") + '"data-name="' + tagName.fullName + '" data-type="tag" data-guid="' + model.get('$id$').id + '" ></i></a>';
+                    popTag += '<a class="' + className + '" data-id="tagClick"><span class="inputValue">' + tagName.fullName + '</span><i class="fa fa-times" data-id="delete"  data-assetname="' + model.get("name") + '"data-name="' + tagName.fullName + '" data-type="tag" data-guid="' + (model.get('$id$').id || model.get('$id$')) + '" ></i></a>';
                 } else {
-                    atags += '<a class="' + className + '" data-id="tagClick"><span class="inputValue">' + tagName.fullName + '</span><i class="fa fa-times" data-id="delete" data-assetname="' + model.get("name") + '" data-name="' + tagName.fullName + '"  data-type="tag" data-guid="' + model.get('$id$').id + '" ></i></a>';
+                    atags += '<a class="' + className + '" data-id="tagClick"><span class="inputValue">' + tagName.fullName + '</span><i class="fa fa-times" data-id="delete" data-assetname="' + model.get("name") + '" data-name="' + tagName.fullName + '"  data-type="tag" data-guid="' + (model.get('$id$').id || model.get('$id$')) + '" ></i></a>';
                 }
                 ++count;
             }
         });
         if (model.get('$id$')) {
-            addTag += '<a href="javascript:void(0)" data-id="addTag" class="inputTagAdd assignTag" data-guid="' + model.get('$id$').id + '" ><i class="fa fa-plus"></i></a>';
+            addTag += '<a href="javascript:void(0)" data-id="addTag" class="inputTagAdd assignTag" data-guid="' + (model.get('$id$').id || model.get('$id$')) + '" ><i class="fa fa-plus"></i></a>';
         } else {
             addTag += '<a href="javascript:void(0)" data-id="addTag" class="inputTagAdd assignTag"><i style="right:0" class="fa fa-plus"></i></a>';
         }

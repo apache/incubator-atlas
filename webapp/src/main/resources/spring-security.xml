@@ -14,17 +14,15 @@
              xmlns:beans="http://www.springframework.org/schema/beans"
              xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
              xmlns:security="http://www.springframework.org/schema/security"
-             xmlns:util="http://www.springframework.org/schema/util"
-             xmlns:oauth="http://www.springframework.org/schema/security/oauth2"
              xmlns:context="http://www.springframework.org/schema/context"
              xsi:schemaLocation="http://www.springframework.org/schema/beans
     http://www.springframework.org/schema/beans/spring-beans-3.1.xsd
     http://www.springframework.org/schema/security
     http://www.springframework.org/schema/security/spring-security-3.1.xsd
-    http://www.springframework.org/schema/util
-    http://www.springframework.org/schema/util/spring-util-3.1.xsd
-    http://www.springframework.org/schema/security/oauth2
-    http://www.springframework.org/schema/security/spring-security-oauth2-1.0.xsd
+
+
+
+
     http://www.springframework.org/schema/context 
     http://www.springframework.org/schema/context/spring-context-3.1.xsd">
 
@@ -33,6 +31,7 @@
     <security:http pattern="/img/**" security="none" />
     <security:http pattern="/libs/**" security="none" />
     <security:http pattern="/js/**" security="none" />
+    <security:http pattern="/ieerror.html" security="none" />
     <security:http pattern="/api/atlas/admin/status" security="none" />
 
     <security:http disable-url-rewriting="true"
@@ -41,6 +40,7 @@
         <security:session-management
                 session-fixation-protection="newSession" />
         <intercept-url pattern="/**" access="isAuthenticated()" />
+        <custom-filter ref="ssoAuthenticationFilter" after="BASIC_AUTH_FILTER" />
 
         <security:custom-filter ref="krbAuthenticationFilter" after="SERVLET_API_SUPPORT_FILTER" />
         <security:custom-filter ref="CSRFPreventionFilter" after="REMEMBER_ME_FILTER" />
@@ -52,7 +52,7 @@
                 username-parameter="j_username"
                 password-parameter="j_password" />
 
-        <security:logout logout-success-url="/login.jsp" delete-cookies="JSESSIONID"
+        <security:logout logout-success-url="/login.jsp" delete-cookies="ATLASSESSIONID"
                          logout-url="/logout.html" />
         <http-basic />
         <security:custom-filter position="LAST" ref="atlasAuthorizationFilter"/>
@@ -60,7 +60,10 @@
 
     <beans:bean id="krbAuthenticationFilter" class="org.apache.atlas.web.filters.AtlasAuthenticationFilter">
     </beans:bean>
-    
+
+    <beans:bean id="ssoAuthenticationFilter" class="org.apache.atlas.web.filters.AtlasKnoxSSOAuthenticationFilter">
+    </beans:bean>
+
     <beans:bean id="CSRFPreventionFilter" class="org.apache.atlas.web.filters.AtlasCSRFPreventionFilter">
     </beans:bean>
 

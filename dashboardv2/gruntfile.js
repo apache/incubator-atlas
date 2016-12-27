@@ -125,10 +125,12 @@ module.exports = function(grunt) {
                     'jquery-asBreadcrumbs/js': 'jquery-asBreadcrumbs/dist/jquery-asBreadcrumbs.min.js',
                     'd3': 'd3/d3.min.js',
                     'd3/': 'd3-tip/index.js',
-                    'noty/js': 'noty/js/noty/packaged/jquery.noty.packaged.min.js',
                     'dagre-d3': 'dagre-d3/dist/dagre-d3.min.js',
-                    'select2': 'select2/dist/js/select2.min.js',
-                    'backgrid-select-all': 'backgrid-select-all/backgrid-select-all.min.js'
+                    'select2': 'select2/dist/js/select2.full.min.js',
+                    'backgrid-select-all': 'backgrid-select-all/backgrid-select-all.min.js',
+                    'moment/js': 'moment/min/moment.min.js',
+                    'jquery-placeholder/js': 'jquery-placeholder/jquery.placeholder.js',
+                    'platform': 'platform/platform.js'
                 }
             },
             css: {
@@ -142,7 +144,7 @@ module.exports = function(grunt) {
                     'backgrid-orderable-columns/css': 'backgrid-orderable-columns/backgrid-orderable-columns.css',
                     'backgrid-paginator/css': 'backgrid-paginator/backgrid-paginator.css',
                     'backgrid-sizeable-columns/css': 'backgrid-sizeable-columns/backgrid-sizeable-columns.css',
-                    'jquery-asBreadcrumbs/css': 'jquery-asBreadcrumbs/css/asBreadcrumbs.css',
+                    'jquery-asBreadcrumbs/css': 'jquery-asBreadcrumbs/dist/css/asBreadcrumbs.min.css',
                     'select2/css': 'select2/dist/css/select2.min.css',
                     'backgrid-select-all': 'backgrid-select-all/backgrid-select-all.min.css',
                     'font-awesome/css': 'font-awesome/css/font-awesome.min.css',
@@ -168,12 +170,13 @@ module.exports = function(grunt) {
                     'backgrid-orderable-columns': 'backgrid-orderable-columns/LICENSE-MIT',
                     'backgrid-paginator': 'backgrid-paginator/LICENSE-MIT',
                     'backgrid-sizeable-columns': 'backgrid-sizeable-columns/LICENSE-MIT',
-                    'jquery-asBreadcrumbs': 'jquery-asBreadcrumbs/LICENSE-GPL',
+                    'jquery-asBreadcrumbs': 'jquery-asBreadcrumbs/LICENSE',
                     'd3': 'd3/LICENSE',
                     'd3/': 'd3-tip/LICENSE',
-                    'noty': 'noty/LICENSE.txt',
                     'dagre-d3': 'dagre-d3/LICENSE',
-                    'backgrid-select-all': 'backgrid-select-all/LICENSE-MIT'
+                    'backgrid-select-all': 'backgrid-select-all/LICENSE-MIT',
+                    'jquery-placeholder': 'jquery-placeholder/LICENSE.txt',
+                    'platform/': 'platform/LICENSE'
                 }
             }
         },

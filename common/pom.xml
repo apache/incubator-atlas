@@ -29,10 +29,6 @@
     <name>Apache Atlas Common</name>
     <packaging>jar</packaging>
 
-    <properties>
-        <checkstyle.failOnViolation>true</checkstyle.failOnViolation>
-    </properties>
-
     <dependencies>
         <dependency>
             <groupId>org.testng</groupId>
@@ -70,5 +66,11 @@
             <version>${spring.version}</version>
         </dependency>
 
+        <dependency>
+            <groupId>com.google.guava</groupId>
+            <artifactId>guava</artifactId>
+            <version>${guava.version}</version>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 </project>

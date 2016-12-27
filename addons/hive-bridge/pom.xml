@@ -149,146 +149,160 @@
 
         <dependency>
             <groupId>org.apache.atlas</groupId>
+            <artifactId>atlas-graphdb-impls</artifactId>
+            <type>pom</type>
+            <scope>test</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>org.apache.atlas</groupId>
             <artifactId>atlas-typesystem</artifactId>
             <classifier>tests</classifier>
             <scope>test</scope>
         </dependency>
     </dependencies>
 
+    <profiles>
+        <profile>
+            <id>dist</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-dependency-plugin</artifactId>
+                        <executions>
+                            <execution>
+                                <id>copy-hook</id>
+                                <phase>package</phase>
+                                <goals>
+                                    <goal>copy</goal>
+                                </goals>
+                                <configuration>
+                                    <outputDirectory>${project.build.directory}/dependency/hook/hive/atlas-hive-plugin-impl</outputDirectory>
+                                    <overWriteReleases>false</overWriteReleases>
+                                    <overWriteSnapshots>false</overWriteSnapshots>
+                                    <overWriteIfNewer>true</overWriteIfNewer>
+                                    <artifactItems>
+                                        <artifactItem>
+                                            <groupId>${project.groupId}</groupId>
+                                            <artifactId>${project.artifactId}</artifactId>
+                                            <version>${project.version}</version>
+                                        </artifactItem>
+                                        <artifactItem>
+                                            <groupId>org.json4s</groupId>
+                                            <artifactId>json4s-native_${scala.binary.version}</artifactId>
+                                            <version>${json.version}</version>
+                                        </artifactItem>
+                                        <artifactItem>
+                                            <groupId>org.json4s</groupId>
+                                            <artifactId>json4s-core_${scala.binary.version}</artifactId>
+                                            <version>${json.version}</version>
+                                        </artifactItem>
+                                        <artifactItem>
+                                            <groupId>org.json4s</groupId>
+                                            <artifactId>json4s-ast_${scala.binary.version}</artifactId>
+                                            <version>${json.version}</version>
+                                        </artifactItem>
+                                        <artifactItem>
+                                            <groupId>${project.groupId}</groupId>
+                                            <artifactId>atlas-client</artifactId>
+                                            <version>${project.version}</version>
+                                        </artifactItem>
+                                        <artifactItem>
+                                            <groupId>${project.groupId}</groupId>
+                                            <artifactId>atlas-typesystem</artifactId>
+                                            <version>${project.version}</version>
+                                        </artifactItem>
+                                        <artifactItem>
+                                            <groupId>${project.groupId}</groupId>
+                                            <artifactId>atlas-notification</artifactId>
+                                            <version>${project.version}</version>
+                                        </artifactItem>
+                                        <artifactItem>
+                                            <groupId>${project.groupId}</groupId>
+                                            <artifactId>hdfs-model</artifactId>
+                                            <version>${project.version}</version>
+                                        </artifactItem>
+                                        <artifactItem>
+                                            <groupId>${project.groupId}</groupId>
+                                            <artifactId>atlas-common</artifactId>
+                                            <version>${project.version}</version>
+                                        </artifactItem>
+                                        <artifactItem>
+                                            <groupId>org.scala-lang</groupId>
+                                            <artifactId>scala-compiler</artifactId>
+                                            <version>${scala.version}</version>
+                                        </artifactItem>
+                                        <artifactItem>
+                                            <groupId>org.scala-lang</groupId>
+                                            <artifactId>scala-reflect</artifactId>
+                                            <version>${scala.version}</version>
+                                        </artifactItem>
+                                        <artifactItem>
+                                            <groupId>org.scala-lang</groupId>
+                                            <artifactId>scala-library</artifactId>
+                                            <version>${scala.version}</version>
+                                        </artifactItem>
+                                        <artifactItem>
+                                            <groupId>org.scala-lang</groupId>
+                                            <artifactId>scalap</artifactId>
+                                            <version>${scala.version}</version>
+                                        </artifactItem>
+                                        <artifactItem>
+                                            <groupId>com.google.inject.extensions</groupId>
+                                            <artifactId>guice-multibindings</artifactId>
+                                        </artifactItem>
+                                        <artifactItem>
+                                            <groupId>org.apache.kafka</groupId>
+                                            <artifactId>kafka_${scala.binary.version}</artifactId>
+                                            <version>${kafka.version}</version>
+                                        </artifactItem>
+                                        <artifactItem>
+                                            <groupId>org.apache.kafka</groupId>
+                                            <artifactId>kafka-clients</artifactId>
+                                            <version>${kafka.version}</version>
+                                        </artifactItem>
+                                        <artifactItem>
+                                            <groupId>com.google.code.gson</groupId>
+                                            <artifactId>gson</artifactId>
+                                            <version>${gson.version}</version>
+                                        </artifactItem>
+                                    </artifactItems>
+                                </configuration>
+                            </execution>
+                            <execution>
+                                <id>copy-hook-shim</id>
+                                <phase>package</phase>
+                                <goals>
+                                    <goal>copy</goal>
+                                </goals>
+                                <configuration>
+                                    <outputDirectory>${project.build.directory}/dependency/hook/hive</outputDirectory>
+                                    <overWriteReleases>false</overWriteReleases>
+                                    <overWriteSnapshots>false</overWriteSnapshots>
+                                    <overWriteIfNewer>true</overWriteIfNewer>
+                                    <artifactItems>
+                                        <artifactItem>
+                                            <groupId>${project.groupId}</groupId>
+                                            <artifactId>hive-bridge-shim</artifactId>
+                                            <version>${project.version}</version>
+                                        </artifactItem>
+                                        <artifactItem>
+                                            <groupId>${project.groupId}</groupId>
+                                            <artifactId>atlas-plugin-classloader</artifactId>
+                                            <version>${project.version}</version>
+                                        </artifactItem>
+                                    </artifactItems>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
     <build>
         <plugins>
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-dependency-plugin</artifactId>
-                <executions>
-                    <execution>
-                        <id>copy-hook</id>
-                        <phase>package</phase>
-                        <goals>
-                            <goal>copy</goal>
-                        </goals>
-                        <configuration>
-                            <outputDirectory>${project.build.directory}/dependency/hook/hive/atlas-hive-plugin-impl</outputDirectory>
-                            <overWriteReleases>false</overWriteReleases>
-                            <overWriteSnapshots>false</overWriteSnapshots>
-                            <overWriteIfNewer>true</overWriteIfNewer>
-                            <artifactItems>
-                                <artifactItem>
-                                    <groupId>${project.groupId}</groupId>
-                                    <artifactId>${project.artifactId}</artifactId>
-                                    <version>${project.version}</version>
-                                </artifactItem>
-                                <artifactItem>
-                                    <groupId>org.json4s</groupId>
-                                    <artifactId>json4s-native_2.10</artifactId>
-                                    <version>${json.version}</version>
-                                </artifactItem>
-                                <artifactItem>
-                                    <groupId>org.json4s</groupId>
-                                    <artifactId>json4s-core_2.10</artifactId>
-                                    <version>${json.version}</version>
-                                </artifactItem>
-                                <artifactItem>
-                                    <groupId>org.json4s</groupId>
-                                    <artifactId>json4s-ast_2.10</artifactId>
-                                    <version>${json.version}</version>
-                                </artifactItem>
-                                <artifactItem>
-                                    <groupId>${project.groupId}</groupId>
-                                    <artifactId>atlas-client</artifactId>
-                                    <version>${project.version}</version>
-                                </artifactItem>
-                                <artifactItem>
-                                    <groupId>${project.groupId}</groupId>
-                                    <artifactId>atlas-typesystem</artifactId>
-                                    <version>${project.version}</version>
-                                </artifactItem>
-                                <artifactItem>
-                                    <groupId>${project.groupId}</groupId>
-                                    <artifactId>atlas-notification</artifactId>
-                                    <version>${project.version}</version>
-                                </artifactItem>
-                                <artifactItem>
-                                    <groupId>${project.groupId}</groupId>
-                                    <artifactId>hdfs-model</artifactId>
-                                    <version>${project.version}</version>
-                                </artifactItem>
-                                <artifactItem>
-                                    <groupId>${project.groupId}</groupId>
-                                    <artifactId>atlas-common</artifactId>
-                                    <version>${project.version}</version>
-                                </artifactItem>
-                                <artifactItem>
-                                    <groupId>org.scala-lang</groupId>
-                                    <artifactId>scala-compiler</artifactId>
-                                    <version>${scala.version}</version>
-                                </artifactItem>
-                                <artifactItem>
-                                    <groupId>org.scala-lang</groupId>
-                                    <artifactId>scala-reflect</artifactId>
-                                    <version>${scala.version}</version>
-                                </artifactItem>
-                                <artifactItem>
-                                    <groupId>org.scala-lang</groupId>
-                                    <artifactId>scala-library</artifactId>
-                                    <version>${scala.version}</version>
-                                </artifactItem>
-                                <artifactItem>
-                                    <groupId>org.scala-lang</groupId>
-                                    <artifactId>scalap</artifactId>
-                                    <version>${scala.version}</version>
-                                </artifactItem>
-                                <artifactItem>
-                                    <groupId>com.google.inject.extensions</groupId>
-                                    <artifactId>guice-multibindings</artifactId>
-                                    <version>${guice.version}</version>
-                                </artifactItem>
-                                <artifactItem>
-                                    <groupId>org.apache.kafka</groupId>
-                                    <artifactId>kafka_${scala.binary.version}</artifactId>
-                                    <version>${kafka.version}</version>
-                                </artifactItem>
-                                <artifactItem>
-                                    <groupId>org.apache.kafka</groupId>
-                                    <artifactId>kafka-clients</artifactId>
-                                    <version>${kafka.version}</version>
-                                </artifactItem>
-                                <artifactItem>
-                                    <groupId>com.google.code.gson</groupId>
-                                    <artifactId>gson</artifactId>
-                                    <version>${gson.version}</version>
-                                </artifactItem>
-                            </artifactItems>
-                        </configuration>
-                    </execution>
-                    <execution>
-                        <id>copy-hook-shim</id>
-                        <phase>package</phase>
-                        <goals>
-                            <goal>copy</goal>
-                        </goals>
-                        <configuration>
-                            <outputDirectory>${project.build.directory}/dependency/hook/hive</outputDirectory>
-                            <overWriteReleases>false</overWriteReleases>
-                            <overWriteSnapshots>false</overWriteSnapshots>
-                            <overWriteIfNewer>true</overWriteIfNewer>
-                            <artifactItems>
-                                <artifactItem>
-                                    <groupId>${project.groupId}</groupId>
-                                    <artifactId>hive-bridge-shim</artifactId>
-                                    <version>${project.version}</version>
-                                </artifactItem>
-                                <artifactItem>
-                                    <groupId>${project.groupId}</groupId>
-                                    <artifactId>atlas-plugin-classloader</artifactId>
-                                    <version>${project.version}</version>
-                                </artifactItem>
-                            </artifactItems>
-                        </configuration>
-                    </execution>
-                </executions>
-            </plugin>
-
             <plugin>
                 <groupId>org.eclipse.jetty</groupId>
                 <artifactId>jetty-maven-plugin</artifactId>
@@ -327,6 +341,10 @@
                         <systemProperty>
                             <key>atlas.conf</key>
                             <value>${project.build.directory}/../../../typesystem/target/test-classes</value>
+                        </systemProperty>
+                        <systemProperty>
+                            <key>atlas.home</key>
+                            <value>${project.basedir}/target</value>
                         </systemProperty>
                     </systemProperties>
                     <stopKey>atlas-stop</stopKey>
@@ -384,23 +402,28 @@
                 <version>1.2.1</version>
                 <inherited>false</inherited>
                 <executions>
+                </executions>
+            </plugin>
+
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-resources-plugin</artifactId>
+                <executions>
                     <execution>
-                        <configuration>
-                            <mainClass>org.apache.atlas.hive.model.HiveDataModelGenerator</mainClass>
-                            <systemProperties>
-                                <systemProperty>
-                                    <key>atlas.conf</key>
-                                    <value>${project.build.directory}/../../../typesystem/target/test-classes</value>
-                                </systemProperty>
-                            </systemProperties>
-                            <arguments>
-                                <argument>${project.build.directory}/models/hive_model.json</argument>
-                            </arguments>
-                        </configuration>
-                        <phase>package</phase>
+                        <id>copy-resources</id>
+                        <phase>validate</phase>
                         <goals>
-                            <goal>java</goal>
+                            <goal>copy-resources</goal>
                         </goals>
+                        <configuration>
+                            <outputDirectory>${basedir}/target/models</outputDirectory>
+                            <resources>
+                                <resource>
+                                    <directory>${basedir}/../models</directory>
+                                    <filtering>true</filtering>
+                                </resource>
+                            </resources>
+                        </configuration>
                     </execution>
                 </executions>
             </plugin>

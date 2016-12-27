@@ -21,6 +21,7 @@ package org.apache.atlas.web.filters;
 import com.google.inject.Singleton;
 import org.apache.atlas.AtlasClient;
 import org.apache.atlas.RequestContext;
+import org.apache.atlas.metrics.Metrics;
 import org.apache.atlas.web.util.DateTimeHelper;
 import org.apache.atlas.web.util.Servlets;
 import org.slf4j.Logger;
@@ -47,6 +48,7 @@ public class AuditFilter implements Filter {
 
     private static final Logger AUDIT_LOG = LoggerFactory.getLogger("AUDIT");
     private static final Logger LOG = LoggerFactory.getLogger(AuditFilter.class);
+    private static final Logger METRICS_LOG = LoggerFactory.getLogger("METRICS");
 
     @Override
     public void init(FilterConfig filterConfig) throws ServletException {
@@ -73,6 +75,7 @@ public class AuditFilter implements Filter {
             // put the request id into the response so users can trace logs for this request
             ((HttpServletResponse) response).setHeader(AtlasClient.REQUEST_ID, requestId);
             currentThread.setName(oldName);
+            recordMetrics();
             RequestContext.clear();
         }
     }
@@ -88,8 +91,6 @@ public class AuditFilter implements Filter {
         final String whatURL = Servlets.getRequestURL(httpRequest);
         final String whatAddrs = httpRequest.getLocalAddr();
 
-        LOG.info("Audit: {}/{} performed request {} {} ({}) at time {}", who, fromAddress, whatRequest, whatURL,
-                whatAddrs, whenISO9601);
         audit(who, fromAddress, whatRequest, fromHost, whatURL, whatAddrs, whenISO9601);
     }
 
@@ -104,6 +105,14 @@ public class AuditFilter implements Filter {
         AUDIT_LOG.info("Audit: {}/{}-{} performed request {} {} ({}) at time {}", who, fromAddress, fromHost, whatRequest, whatURL,
                 whatAddrs, whenISO9601);
     }
+
+    public static void recordMetrics() {
+        //record metrics
+        Metrics requestMetrics = RequestContext.getMetrics();
+        if (!requestMetrics.isEmpty()) {
+            METRICS_LOG.info("{}", requestMetrics);
+        }
+     }
 
     @Override
     public void destroy() {

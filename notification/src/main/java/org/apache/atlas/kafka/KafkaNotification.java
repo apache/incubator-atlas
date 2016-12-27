@@ -241,7 +241,6 @@ public class KafkaNotification extends AbstractNotification implements Service {
                 LOG.debug("Sent message for topic - {}, partition - {}, offset - {}", response.topic(),
                     response.partition(), response.offset());
             } catch (Exception e) {
-                LOG.warn("Could not send message - {}", context.getMessage(), e);
                 lastFailureException = e;
                 failedMessages.add(context.getMessage());
             }
@@ -278,7 +277,7 @@ public class KafkaNotification extends AbstractNotification implements Service {
     protected <T> org.apache.atlas.kafka.KafkaConsumer<T>
     createKafkaConsumer(Class<T> type, MessageDeserializer<T> deserializer, KafkaStream stream,
                         int consumerId, ConsumerConnector consumerConnector, boolean autoCommitEnabled) {
-        return new org.apache.atlas.kafka.KafkaConsumer<T>(deserializer, stream,
+        return new org.apache.atlas.kafka.KafkaConsumer<>(deserializer, stream,
                 consumerId, consumerConnector, autoCommitEnabled);
     }
 
@@ -295,7 +294,7 @@ public class KafkaNotification extends AbstractNotification implements Service {
         consumerProperties.putAll(properties);
         consumerProperties.put(ConsumerConfig.GROUP_ID_CONFIG, groupId);
 
-        LOG.info("Consumer property: auto.commit.enable: " + consumerProperties.getProperty("auto.commit.enable"));
+        LOG.info("Consumer property: auto.commit.enable: {}", consumerProperties.getProperty("auto.commit.enable"));
         return consumerProperties;
     }
 

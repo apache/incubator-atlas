@@ -32,6 +32,7 @@ import java.nio.charset.Charset;
 import java.security.MessageDigest;
 import java.util.Date;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -45,6 +46,7 @@ public class Id implements ITypedReferenceableInstance {
     public final int version;
     public EntityState state;
     private static AtomicLong s_nextId = new AtomicLong(System.nanoTime());
+    public final AtlasSystemAttributes systemAttributes;
 
     public Id(String id, int version, String typeName, String state) {
         id       = ParamChecker.notEmpty(id, "id");
@@ -58,6 +60,7 @@ public class Id implements ITypedReferenceableInstance {
         } else {
             this.state = EntityState.valueOf(state.toUpperCase());
         }
+        this.systemAttributes = new AtlasSystemAttributes();
     }
 
     public Id(String id, int version, String typeName) {
@@ -105,6 +108,11 @@ public class Id implements ITypedReferenceableInstance {
         return String.format("id[type=%s guid=%s state=%s]", typeName, id, state);
     }
 
+    @Override
+    public AtlasSystemAttributes getSystemAttributes(){
+        return systemAttributes;
+    }
+
     public String getClassName() {
         return typeName;
     }
@@ -127,34 +135,18 @@ public class Id implements ITypedReferenceableInstance {
 
     @Override
     public boolean equals(Object o) {
-        if (this == o) {
-            return true;
-        }
-        if (o == null || getClass() != o.getClass()) {
-            return false;
-        }
-
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
         Id id1 = (Id) o;
-
-        if (version != id1.version) {
-            return false;
-        }
-        if (!typeName.equals(id1.typeName)) {
-            return false;
-        }
-        if (!id.equals(id1.id)) {
-            return false;
-        }
-
-        return true;
+        return version == id1.version &&
+                Objects.equals(id, id1.id) &&
+                Objects.equals(typeName, id1.typeName) &&
+                state == id1.state;
     }
 
     @Override
     public int hashCode() {
-        int result = id.hashCode();
-        result = 31 * result + typeName.hashCode();
-        result = 31 * result + version;
-        return result;
+        return Objects.hash(id, typeName, version, state);
     }
 
     @Override

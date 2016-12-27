@@ -20,18 +20,20 @@ package org.apache.atlas.repository.graph;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
-import com.thinkaurelius.titan.core.TitanGraph;
-import com.thinkaurelius.titan.core.util.TitanCleanup;
-import com.tinkerpop.blueprints.Vertex;
 
 import org.apache.atlas.AtlasClient;
 import org.apache.atlas.AtlasClient.EntityResult;
 import org.apache.atlas.AtlasException;
+import org.apache.atlas.GraphTransaction;
 import org.apache.atlas.RepositoryMetadataModule;
 import org.apache.atlas.RequestContext;
 import org.apache.atlas.TestUtils;
 import org.apache.atlas.repository.Constants;
+import org.apache.atlas.repository.MetadataRepository;
 import org.apache.atlas.repository.RepositoryException;
+import org.apache.atlas.repository.graphdb.AtlasGraph;
+import org.apache.atlas.repository.graphdb.AtlasVertex;
+import org.apache.atlas.type.AtlasTypeRegistry;
 import org.apache.atlas.typesystem.IReferenceableInstance;
 import org.apache.atlas.typesystem.IStruct;
 import org.apache.atlas.typesystem.ITypedReferenceableInstance;
@@ -61,8 +63,10 @@ import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Guice;
 import org.testng.annotations.Test;
 
-import javax.inject.Inject;
-
+import java.lang.reflect.InvocationHandler;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
+import java.lang.reflect.Proxy;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -93,10 +97,7 @@ import static org.testng.Assert.fail;
 @Guice(modules = RepositoryMetadataModule.class)
 public abstract class GraphBackedMetadataRepositoryDeleteTestBase {
 
-    @Inject
-    private GraphProvider<TitanGraph> graphProvider;
-
-    protected GraphBackedMetadataRepository repositoryService;
+    protected MetadataRepository repositoryService;
 
     private TypeSystem typeSystem;
 
@@ -106,12 +107,50 @@ public abstract class GraphBackedMetadataRepositoryDeleteTestBase {
 
     @BeforeClass
     public void setUp() throws Exception {
+
         typeSystem = TypeSystem.getInstance();
         typeSystem.reset();
 
-        new GraphBackedSearchIndexer(graphProvider);
+        new GraphBackedSearchIndexer(new AtlasTypeRegistry());
+        final GraphBackedMetadataRepository delegate = new GraphBackedMetadataRepository(getDeleteHandler(typeSystem));
 
-        repositoryService = new GraphBackedMetadataRepository(graphProvider, getDeleteHandler(typeSystem));
+        repositoryService = (MetadataRepository)Proxy.newProxyInstance(Thread.currentThread().getContextClassLoader(),
+                new Class[]{MetadataRepository.class}, new InvocationHandler() {
+
+            @Override
+            public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
+                boolean useTransaction = GraphBackedMetadataRepository.class.getMethod(
+                        method.getName(), method.getParameterTypes())
+                        .isAnnotationPresent(GraphTransaction.class);
+                try {
+
+                    Object result = method.invoke(delegate, args);
+                    if(useTransaction) {
+                        System.out.println("Committing changes");
+                        TestUtils.getGraph().commit();
+                        System.out.println("Commit succeeded.");
+                    }
+                    return result;
+                }
+                catch(InvocationTargetException e) {
+                    e.getCause().printStackTrace();
+                    if(useTransaction) {
+                        System.out.println("Rolling back changes due to exception.");
+                        TestUtils.getGraph().rollback();
+                    }
+                    throw e.getCause();
+                }
+                catch(Throwable t) {
+                    t.printStackTrace();
+                    if(useTransaction) {
+                        System.out.println("Rolling back changes due to exception.");
+                        TestUtils.getGraph().rollback();
+                    }
+                    throw t;
+                }
+            }
+
+        });
 
         TestUtils.defineDeptEmployeeTypes(typeSystem);
         TestUtils.createHiveTypes(typeSystem);
@@ -139,22 +178,13 @@ public abstract class GraphBackedMetadataRepositoryDeleteTestBase {
 
     @BeforeMethod
     public void setupContext() {
-        RequestContext.createContext();
+        TestUtils.resetRequestContext();
     }
 
     @AfterClass
     public void tearDown() throws Exception {
         TypeSystem.getInstance().reset();
-        try {
-            graphProvider.get().shutdown();
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-        try {
-            TitanCleanup.clear(graphProvider.get());
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
+        AtlasGraphProvider.cleanup();
     }
 
     @Test
@@ -366,7 +396,7 @@ public abstract class GraphBackedMetadataRepositoryDeleteTestBase {
         assertVerticesDeleted(getVertices(Constants.ENTITY_TYPE_PROPERTY_KEY, "SecurityClearance"));
     }
 
-    protected abstract void assertVerticesDeleted(List<Vertex> vertices);
+    protected abstract void assertVerticesDeleted(List<AtlasVertex> vertices);
 
     @Test
     public void testDeleteEntitiesWithCompositeMapReference() throws Exception {
@@ -388,8 +418,8 @@ public abstract class GraphBackedMetadataRepositoryDeleteTestBase {
         String edgeLabel = GraphHelper.getEdgeLabel(compositeMapOwnerType, compositeMapOwnerType.fieldMapping.fields.get("map"));
         String mapEntryLabel = edgeLabel + "." + "value1";
         AtlasEdgeLabel atlasEdgeLabel = new AtlasEdgeLabel(mapEntryLabel);
-        Vertex mapOwnerVertex = GraphHelper.getInstance().getVertexForGUID(mapOwnerGuid);
-        object = mapOwnerVertex.getProperty(atlasEdgeLabel.getQualifiedMapKey());
+        AtlasVertex mapOwnerVertex = GraphHelper.getInstance().getVertexForGUID(mapOwnerGuid);
+        object = mapOwnerVertex.getProperty(atlasEdgeLabel.getQualifiedMapKey(), Object.class);
         Assert.assertNotNull(object);
 
         List<String> deletedEntities = deleteEntities(mapOwnerGuid).getDeletedEntities();
@@ -432,11 +462,11 @@ public abstract class GraphBackedMetadataRepositoryDeleteTestBase {
 
         ITypedReferenceableInstance max = repositoryService.getEntityDefinition(nameGuidMap.get("Max"));
         String maxGuid = max.getId()._getId();
-        Vertex vertex = GraphHelper.getInstance().getVertexForGUID(maxGuid);
-        Long creationTimestamp = vertex.getProperty(Constants.TIMESTAMP_PROPERTY_KEY);
+        AtlasVertex vertex = GraphHelper.getInstance().getVertexForGUID(maxGuid);
+        Long creationTimestamp = GraphHelper.getSingleValuedProperty(vertex, Constants.TIMESTAMP_PROPERTY_KEY, Long.class);
         Assert.assertNotNull(creationTimestamp);
 
-        Long modificationTimestampPreUpdate = vertex.getProperty(Constants.MODIFICATION_TIMESTAMP_PROPERTY_KEY);
+        Long modificationTimestampPreUpdate = GraphHelper.getSingleValuedProperty(vertex, Constants.MODIFICATION_TIMESTAMP_PROPERTY_KEY, Long.class);
         Assert.assertNotNull(modificationTimestampPreUpdate);
 
         ITypedReferenceableInstance jane = repositoryService.getEntityDefinition(nameGuidMap.get("Jane"));
@@ -457,7 +487,7 @@ public abstract class GraphBackedMetadataRepositoryDeleteTestBase {
 
         // Verify modification timestamp was updated.
         vertex = GraphHelper.getInstance().getVertexForGUID(maxGuid);
-        Long modificationTimestampPostUpdate = vertex.getProperty(Constants.MODIFICATION_TIMESTAMP_PROPERTY_KEY);
+        Long modificationTimestampPostUpdate = GraphHelper.getSingleValuedProperty(vertex, Constants.MODIFICATION_TIMESTAMP_PROPERTY_KEY, Long.class);
         Assert.assertNotNull(modificationTimestampPostUpdate);
         Assert.assertTrue(creationTimestamp < modificationTimestampPostUpdate);
 
@@ -474,7 +504,7 @@ public abstract class GraphBackedMetadataRepositoryDeleteTestBase {
 
         // Verify modification timestamp was updated.
         vertex = GraphHelper.getInstance().getVertexForGUID(maxGuid);
-        Long modificationTimestampPost2ndUpdate = vertex.getProperty(Constants.MODIFICATION_TIMESTAMP_PROPERTY_KEY);
+        Long modificationTimestampPost2ndUpdate = GraphHelper.getSingleValuedProperty(vertex, Constants.MODIFICATION_TIMESTAMP_PROPERTY_KEY, Long.class);
         Assert.assertNotNull(modificationTimestampPost2ndUpdate);
         Assert.assertTrue(modificationTimestampPostUpdate < modificationTimestampPost2ndUpdate);
 
@@ -764,7 +794,7 @@ public abstract class GraphBackedMetadataRepositoryDeleteTestBase {
 
         // Verify MapOwner.map attribute has expected value.
         String mapValueGuid = null;
-        Vertex mapOwnerVertex = null;
+        AtlasVertex mapOwnerVertex = null;
         mapOwnerInstance = repositoryService.getEntityDefinition(mapOwnerGuid);
         for (String mapAttrName : Arrays.asList("map", "biMap")) {
             Object object = mapOwnerInstance.get(mapAttrName);
@@ -776,7 +806,7 @@ public abstract class GraphBackedMetadataRepositoryDeleteTestBase {
             Assert.assertNotNull(mapValueInstance);
             mapValueGuid = mapValueInstance.getId()._getId();
             mapOwnerVertex = GraphHelper.getInstance().getVertexForGUID(mapOwnerGuid);
-            object = mapOwnerVertex.getProperty(atlasEdgeLabel.getQualifiedMapKey());
+            object = mapOwnerVertex.getProperty(atlasEdgeLabel.getQualifiedMapKey(), Object.class);
             Assert.assertNotNull(object);
         }
 
@@ -884,8 +914,8 @@ public abstract class GraphBackedMetadataRepositoryDeleteTestBase {
         String edgeLabel = GraphHelper.getEdgeLabel(mapOwnerType, mapOwnerType.fieldMapping.fields.get("map"));
         String mapEntryLabel = edgeLabel + "." + "value1";
         AtlasEdgeLabel atlasEdgeLabel = new AtlasEdgeLabel(mapEntryLabel);
-        Vertex mapOwnerVertex = GraphHelper.getInstance().getVertexForGUID(mapOwnerGuid);
-        object = mapOwnerVertex.getProperty(atlasEdgeLabel.getQualifiedMapKey());
+        AtlasVertex mapOwnerVertex = GraphHelper.getInstance().getVertexForGUID(mapOwnerGuid);
+        object = mapOwnerVertex.getProperty(atlasEdgeLabel.getQualifiedMapKey(), Object.class);
         Assert.assertNotNull(object);
 
         // Verify deleting the target of required map attribute throws a NullRequiredAttributeException.
@@ -1076,10 +1106,11 @@ public abstract class GraphBackedMetadataRepositoryDeleteTestBase {
         repositoryService.createEntities(db, table);
     }
 
-    protected List<Vertex> getVertices(String propertyName, Object value) {
-        Iterable<Vertex> vertices = graphProvider.get().getVertices(propertyName, value);
-        List<Vertex> list = new ArrayList<>();
-        for (Vertex vertex : vertices) {
+    protected List<AtlasVertex> getVertices(String propertyName, Object value) {
+        AtlasGraph graph = TestUtils.getGraph();
+        Iterable<AtlasVertex> vertices = graph.getVertices(propertyName, value);
+        List<AtlasVertex> list = new ArrayList<>();
+        for (AtlasVertex vertex : vertices) {
             list.add(vertex);
         }
         return list;

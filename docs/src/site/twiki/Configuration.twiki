@@ -78,6 +78,8 @@ Please note that Solr installation in Cloud mode is a prerequisite before config
  atlas.graph.index.search.backend=solr5
  atlas.graph.index.search.solr.mode=cloud
  atlas.graph.index.search.solr.zookeeper-url=<the ZK quorum setup for solr as comma separated value> eg: 10.1.6.4:2181,10.1.6.5:2181
+ atlas.graph.index.search.solr.zookeeper-connect-timeout=<SolrCloud Zookeeper Connection Timeout>. Default value is 60000 ms
+ atlas.graph.index.search.solr.zookeeper-session-timeout=<SolrCloud Zookeeper Session Timeout>. Default value is 60000 ms
 </verbatim>
 
 Also note that if the embedded-hbase-solr profile is used then Solr is included in the distribution so that a standalone
@@ -236,7 +238,7 @@ atlas.server.ha.zookeeper.session.timeout.ms=20000
 # Specify the scheme and the identity to be used for setting up ACLs on nodes created in Zookeeper for HA.
 # The format of these options is <scheme>:<identity>. For more information refer to http://zookeeper.apache.org/doc/r3.2.2/zookeeperProgrammers.html#sc_ZooKeeperAccessControl.
 # The 'acl' option allows to specify a scheme, identity pair to setup an ACL for.
-atlas.server.ha.zookeeper.acl=auth:sasl:client@comany.com
+atlas.server.ha.zookeeper.acl=sasl:client@comany.com
 # The 'auth' option specifies the authentication that should be used for connecting to Zookeeper.
 atlas.server.ha.zookeeper.auth=sasl:client@company.com
 
@@ -271,4 +273,29 @@ atlas.graph.storage.lock.retries=10
 # Milliseconds to wait before evicting a cached entry. This should be > atlas.graph.storage.lock.wait-time x atlas.graph.storage.lock.retries
 # If this is set to a low value (default is 10000), warnings on transactions taking too long will occur in the Atlas application log.
 atlas.graph.storage.cache.db-cache-time=120000
+
+# Minimum number of threads in the atlas web server
+atlas.webserver.minthreads=10
+
+# Maximum number of threads in the atlas web server
+atlas.webserver.maxthreads=100
+
+# Keepalive time in secs for the thread pool of the atlas web server
+atlas.webserver.keepalivetimesecs=60
+
+# Queue size for the requests(when max threads are busy) for the atlas web server
+atlas.webserver.queuesize=100
+</verbatim>
+
+---+++ Recording performance metrics
+
+Atlas package should be built with '-P perf' to instrument atlas code to collect metrics. The metrics will be recorded in
+<atlas.log.dir>/metric.log, with one log line per API call. The metrics contain the number of times the instrumented methods
+are called and the total time spent in the instrumented method. Logging to metric.log is controlled through log4j configuration
+in atlas-log4j.xml. When the atlas code is instrumented, to disable logging to metric.log at runtime, set log level of METRICS logger to info level:
+<verbatim>
+<logger name="METRICS" additivity="false">
+    <level value="info"/>
+    <appender-ref ref="METRICS"/>
+</logger>
 </verbatim>

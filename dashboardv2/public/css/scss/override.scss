@@ -45,6 +45,8 @@
 .modal-body {
     position: relative;
     padding: 15px;
+    max-height: 400px;
+    overflow: auto;
 }
 
 .cancel {
@@ -150,6 +152,7 @@
 
 .select2-container--default .select2-search--inline .select2-search__field {
     color: #555;
+    width: 300px !important;
 }
 
 .typeLOV {
@@ -237,4 +240,8 @@
             padding: 5px;
         }
     }
+}
+
+.tab-content > .tab-pane.active {
+    overflow-x: hidden;
 }

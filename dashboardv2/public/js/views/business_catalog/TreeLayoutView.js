@@ -22,8 +22,9 @@ define(['require',
     'utils/Utils',
     'collection/VCatalogList',
     'utils/CommonViewFunction',
-    'utils/Messages'
-], function(require, Backbone, TreeLayoutView_tmpl, Utils, VCatalogList, CommonViewFunction, Messages) {
+    'utils/Messages',
+    'utils/UrlLinks'
+], function(require, Backbone, TreeLayoutView_tmpl, Utils, VCatalogList, CommonViewFunction, Messages, UrlLinks) {
     'use strict';
 
     var TreeLayoutView = Backbone.Marionette.LayoutView.extend(
@@ -251,18 +252,18 @@ define(['require',
                     if (parentURL) {
                         this.url = parentURL;
                     } else {
-                        this.url = "api/atlas/v1/taxonomies";
+                        this.url = UrlLinks.taxonomiesApiUrl();
                     }
                 }
                 this.showLoader();
                 if (isParent) {
                     this.parentCollection.url = this.url;
                     this.parentCollection.fullCollection.reset(undefined, { silent: true });
-                    this.parentCollection.fetch({ reset: true });
+                    this.parentCollection.fetch({ reset: true, cache: true });
                 } else {
                     this.childCollection.url = this.url + "?hierarchy/path:.";
                     this.childCollection.fullCollection.reset(undefined, { silent: true });
-                    this.childCollection.fetch({ reset: true });
+                    this.childCollection.fetch({ reset: true, cache: true });
                 }
             },
             showLoader: function() {
@@ -308,7 +309,7 @@ define(['require',
                 var that = this;
                 _.each(this.taxanomy.models, function(model, key) {
                     var name = model.get('name');
-                    that.termCollection.url = "/api/atlas/v1/taxonomies/" + name + "/terms";
+                    that.termCollection.url = UrlLinks.taxonomiesTermsApiUrl(name)
                 });
                 this.termCollection.fetch({ reset: true });
             },
@@ -317,7 +318,7 @@ define(['require',
                 var str = '<option></option>';
                 this.termCollection.fullCollection.comparator = function(model) {
                     return model.get('name');
-                }
+                };
                 this.termCollection.fullCollection.sort().each(function(model) {
                     str += '<option>' + model.get('name') + '</option>';
                 });
@@ -344,7 +345,7 @@ define(['require',
                 });
             },
             selectFirstElement: function() {
-                var dataURL = this.$('.taxonomyTree').find('li[data-id="Parent"]').find("a").data('href')
+                var dataURL = this.$('.taxonomyTree').find('li[data-id="Parent"]').find("a").data('href');
                 if (dataURL) {
                     this.url = dataURL;
                     if (this.viewBased) {
@@ -386,6 +387,7 @@ define(['require',
                         }
                         var name = Utils.checkTagOrTerm(model.get('name'), true);
                         if (name.name) {
+                            // data-name="<space>'<tagName>'"  Space is required for DSL search Input 
                             if (that.viewBased) {
                                 parentLi = '<div class="tools"><i class="fa fa-refresh fa-spin-custom taxanomyloader"></i><i class="fa fa-ellipsis-h termPopover"></i></div><i class="fa fa-angle-right toggleArrow" data-id="expandArrow" data-href="' + hrefUrl + '"></i><a href="javascript:void(0)" data-href="' + hrefUrl + '" data-name="`' + model.get('name') + '`">' + name.name + '</a>';
                             } else {
@@ -405,7 +407,7 @@ define(['require',
                 function createTerm() {
                     that.childCollection.fullCollection.comparator = function(model) {
                         return model.get('name').toLowerCase();
-                    }
+                    };
                     that.childCollection.fullCollection.sort().each(function(model, key) {
                         var name = Utils.checkTagOrTerm(model.get('name'), true);
                         var hrefUrl = "/api" + model.get('href').split("/api")[1];
@@ -528,7 +530,7 @@ define(['require',
                     assetName = $(e.target).data("assetname"),
                     that = this,
                     modal = CommonViewFunction.deleteTagModel({
-                        msg: "<div class='ellipsis'>Delete: " + "<b>" + termName + "?</b></div>" +
+                        msg: "<div class='ellipsis'>Delete: " + "<b>" + _.escape(termName) + "?</b></div>" +
                             "<p class='termNote'>Assets mapped to this term will be unclassified.</p>",
                         titleMessage: Messages.deleteTerm,
                         buttonText: "Delete"
@@ -612,8 +614,9 @@ define(['require',
                     'modules/Modal'
                 ], function(AddTermLayoutView, Modal) {
                     var view = new AddTermLayoutView({
-                        url: "/api/atlas/v1/taxonomies",
-                        model: new that.parentCollection.model()
+                        url: UrlLinks.taxonomiesApiUrl(),
+                        model: new that.parentCollection.model(),
+                        defaultTerm: true
                     });
                     var modal = new Modal({
                         title: 'Taxonomy',
@@ -627,7 +630,6 @@ define(['require',
                     modal.on('ok', function() {
                         that.saveDefaultTaxonomy(view);
                     });
-                    view.ui.termName.attr("placeholder", "Enter Taxonomy Name");
                     view.ui.termName.on('keyup', function() {
                         if (this.value.indexOf(' ') >= 0) {
                             modal.$el.find('button.ok').prop('disabled', true);

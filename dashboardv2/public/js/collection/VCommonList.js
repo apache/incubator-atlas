@@ -20,12 +20,13 @@ define(['require',
     'utils/Globals',
     'collection/BaseCollection',
     'models/VCommon',
-], function(require, Globals, BaseCollection, VCommon) {
+    'utils/UrlLinks'
+], function(require, Globals, BaseCollection, VCommon, UrlLinks) {
     'use strict';
     var VCommonList = BaseCollection.extend(
         //Prototypal attributes
         {
-            url: Globals.baseURL + '',
+            url: UrlLinks.baseURL + '',
 
             model: VCommon,
 

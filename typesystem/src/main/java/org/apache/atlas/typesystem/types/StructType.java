@@ -29,6 +29,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import org.apache.atlas.AtlasConstants;
 import org.apache.atlas.AtlasException;
 import org.apache.atlas.typesystem.IStruct;
 import org.apache.atlas.typesystem.ITypedStruct;
@@ -42,7 +43,11 @@ public class StructType extends AbstractDataType<IStruct> implements IConstructa
     private final TypedStructHandler handler;
 
     protected StructType(TypeSystem typeSystem, String name, String description, int numFields) {
-        super(name, description);
+        this(typeSystem, name, description, AtlasConstants.DEFAULT_TYPE_VERSION, numFields);
+    }
+
+    protected StructType(TypeSystem typeSystem, String name, String description, String version, int numFields) {
+        super(name, description, version);
         this.typeSystem = typeSystem;
         this.fieldMapping = null;
         infoToNameMap = null;
@@ -52,7 +57,12 @@ public class StructType extends AbstractDataType<IStruct> implements IConstructa
 
     protected StructType(TypeSystem typeSystem, String name, String description, AttributeInfo... fields)
     throws AtlasException {
-        super(name, description);
+        this(typeSystem, name, description, AtlasConstants.DEFAULT_TYPE_VERSION, fields);
+    }
+
+    protected StructType(TypeSystem typeSystem, String name, String description, String version, AttributeInfo... fields)
+            throws AtlasException {
+        super(name, description, version);
         this.typeSystem = typeSystem;
         this.fieldMapping = constructFieldMapping(fields);
         infoToNameMap = TypeUtils.buildAttrInfoToNameMap(this.fieldMapping);
@@ -84,9 +94,9 @@ public class StructType extends AbstractDataType<IStruct> implements IConstructa
     protected FieldMapping constructFieldMapping(AttributeInfo... fields)
     throws AtlasException {
 
-        Map<String, AttributeInfo> fieldsMap = new LinkedHashMap<String, AttributeInfo>();
-        Map<String, Integer> fieldPos = new HashMap<String, Integer>();
-        Map<String, Integer> fieldNullPos = new HashMap<String, Integer>();
+        Map<String, AttributeInfo> fieldsMap = new LinkedHashMap<>();
+        Map<String, Integer> fieldPos = new HashMap<>();
+        Map<String, Integer> fieldNullPos = new HashMap<>();
         int numBools = 0;
         int numBytes = 0;
         int numShorts = 0;

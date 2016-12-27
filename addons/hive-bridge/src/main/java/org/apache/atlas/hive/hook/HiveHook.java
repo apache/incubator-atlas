@@ -24,7 +24,7 @@ import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.apache.atlas.AtlasClient;
 import org.apache.atlas.AtlasConstants;
 import org.apache.atlas.hive.bridge.HiveMetaStoreBridge;
-import org.apache.atlas.hive.model.HiveDataModelGenerator;
+import org.apache.atlas.hive.bridge.ColumnLineageUtils;
 import org.apache.atlas.hive.model.HiveDataTypes;
 import org.apache.atlas.hook.AtlasHook;
 import org.apache.atlas.notification.hook.HookNotification;
@@ -36,26 +36,23 @@ import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.metastore.TableType;
 import org.apache.hadoop.hive.metastore.api.Database;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
-import org.apache.hadoop.hive.ql.QueryPlan;
-import org.apache.hadoop.hive.ql.exec.ExplainTask;
-import org.apache.hadoop.hive.ql.exec.Task;
-import org.apache.hadoop.hive.ql.hooks.Entity;
+import org.apache.hadoop.hive.ql.hooks.*;
 import org.apache.hadoop.hive.ql.hooks.Entity.Type;
-import org.apache.hadoop.hive.ql.hooks.ExecuteWithHookContext;
-import org.apache.hadoop.hive.ql.hooks.HookContext;
-import org.apache.hadoop.hive.ql.hooks.ReadEntity;
-import org.apache.hadoop.hive.ql.hooks.WriteEntity;
 import org.apache.hadoop.hive.ql.metadata.HiveException;
 import org.apache.hadoop.hive.ql.metadata.Partition;
 import org.apache.hadoop.hive.ql.metadata.Table;
 import org.apache.hadoop.hive.ql.plan.HiveOperation;
+import org.apache.hadoop.hive.shims.Utils;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.util.ShutdownHookManager;
 import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+
 import java.net.MalformedURLException;
 import java.net.URI;
+import java.security.PrivilegedExceptionAction;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.Date;
@@ -70,6 +67,7 @@ import java.util.SortedMap;
 import java.util.SortedSet;
 import java.util.TreeMap;
 import java.util.TreeSet;
+import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
@@ -97,7 +95,7 @@ public class HiveHook extends AtlasHook implements ExecuteWithHookContext {
     // wait time determines how long we wait before we exit the jvm on
     // shutdown. Pending requests after that will not be sent.
     private static final int WAIT_TIME = 3;
-    private static ExecutorService executor;
+    private static ExecutorService executor = null;
 
     private static final int minThreadsDefault = 1;
     private static final int maxThreadsDefault = 5;
@@ -110,28 +108,36 @@ public class HiveHook extends AtlasHook implements ExecuteWithHookContext {
         try {
             // initialize the async facility to process hook calls. We don't
             // want to do this inline since it adds plenty of overhead for the query.
-            int minThreads = atlasProperties.getInt(MIN_THREADS, minThreadsDefault);
-            int maxThreads = atlasProperties.getInt(MAX_THREADS, maxThreadsDefault);
-            long keepAliveTime = atlasProperties.getLong(KEEP_ALIVE_TIME, keepAliveTimeDefault);
-            int queueSize = atlasProperties.getInt(QUEUE_SIZE, queueSizeDefault);
+            boolean isSync = atlasProperties.getBoolean(CONF_SYNC, Boolean.FALSE);
 
-            executor = new ThreadPoolExecutor(minThreads, maxThreads, keepAliveTime, TimeUnit.MILLISECONDS,
-                new LinkedBlockingQueue<Runnable>(queueSize),
-                new ThreadFactoryBuilder().setNameFormat("Atlas Logger %d").build());
+            if(!isSync) {
+                int minThreads = atlasProperties.getInt(MIN_THREADS, minThreadsDefault);
+                int maxThreads = atlasProperties.getInt(MAX_THREADS, maxThreadsDefault);
+                long keepAliveTime = atlasProperties.getLong(KEEP_ALIVE_TIME, keepAliveTimeDefault);
+                int queueSize = atlasProperties.getInt(QUEUE_SIZE, queueSizeDefault);
 
-            Runtime.getRuntime().addShutdownHook(new Thread() {
-                @Override
-                public void run() {
-                    try {
-                        executor.shutdown();
-                        executor.awaitTermination(WAIT_TIME, TimeUnit.SECONDS);
-                        executor = null;
-                    } catch (InterruptedException ie) {
-                        LOG.info("Interrupt received in shutdown.");
+                executor = new ThreadPoolExecutor(minThreads, maxThreads, keepAliveTime, TimeUnit.MILLISECONDS,
+                        new LinkedBlockingQueue<Runnable>(queueSize),
+                        new ThreadFactoryBuilder().setNameFormat("Atlas Logger %d").build());
+
+                ShutdownHookManager.get().addShutdownHook(new Thread() {
+                    @Override
+                    public void run() {
+                        try {
+                            LOG.info("==> Shutdown of Atlas Hive Hook");
+
+                            executor.shutdown();
+                            executor.awaitTermination(WAIT_TIME, TimeUnit.SECONDS);
+                            executor = null;
+                        } catch (InterruptedException ie) {
+                            LOG.info("Interrupt received in shutdown.");
+                        } finally {
+                            LOG.info("<== Shutdown of Atlas Hive Hook");
+                        }
+                        // shutdown client
                     }
-                    // shutdown client
-                }
-            });
+                }, AtlasConstants.ATLAS_SHUTDOWN_HOOK_PRIORITY);
+            }
 
             setupOperationMap();
         } catch (Exception e) {
@@ -159,30 +165,47 @@ public class HiveHook extends AtlasHook implements ExecuteWithHookContext {
     public void run(final HookContext hookContext) throws Exception {
         // clone to avoid concurrent access
         try {
-            final HiveConf conf = new HiveConf(hookContext.getConf());
-
             final HiveEventContext event = new HiveEventContext();
             event.setInputs(hookContext.getInputs());
             event.setOutputs(hookContext.getOutputs());
-            event.setJsonPlan(getQueryPlan(hookContext.getConf(), hookContext.getQueryPlan()));
             event.setHookType(hookContext.getHookType());
-            event.setUgi(hookContext.getUgi());
-            event.setUser(getUser(hookContext.getUserName()));
+
+            final UserGroupInformation ugi = hookContext.getUgi() == null ? Utils.getUGI() : hookContext.getUgi();
+            event.setUgi(ugi);
+            event.setUser(getUser(hookContext.getUserName(), hookContext.getUgi()));
             event.setOperation(OPERATION_MAP.get(hookContext.getOperationName()));
             event.setQueryId(hookContext.getQueryPlan().getQueryId());
             event.setQueryStr(hookContext.getQueryPlan().getQueryStr());
             event.setQueryStartTime(hookContext.getQueryPlan().getQueryStartTime());
             event.setQueryType(hookContext.getQueryPlan().getQueryPlan().getQueryType());
+            event.setLineageInfo(hookContext.getLinfo());
 
-            boolean sync = conf.get(CONF_SYNC, "false").equals("true");
-            if (sync) {
-                fireAndForget(event);
+            if (executor == null) {
+                collect(event);
+                notifyAsPrivilegedAction(event);
             } else {
                 executor.submit(new Runnable() {
                     @Override
                     public void run() {
                         try {
-                            fireAndForget(event);
+                            ugi.doAs(new PrivilegedExceptionAction<Object>() {
+                                @Override
+                                public Object run() throws Exception {
+                                    collect(event);
+                                    return event;
+                                }
+                            });
+
+                            //Notify as 'hive' service user in Kerberos mode else will default to the current user - doAs mode
+                            UserGroupInformation realUser = ugi.getRealUser();
+                            if (realUser != null) {
+                                LOG.info("Sending notification for event {} as service user {} ", event.getOperation(), realUser.getShortUserName());
+                                realUser.doAs(notifyAsPrivilegedAction(event));
+                            } else {
+                                //Unsecure or without doAs
+                                LOG.info("Sending notification for event {} as current user {} ", event.getOperation(), ugi.getShortUserName());
+                                ugi.doAs(notifyAsPrivilegedAction(event));
+                            }
                         } catch (Throwable e) {
                             LOG.error("Atlas hook failed due to error ", e);
                         }
@@ -194,11 +217,21 @@ public class HiveHook extends AtlasHook implements ExecuteWithHookContext {
         }
     }
 
-    private void fireAndForget(HiveEventContext event) throws Exception {
+    PrivilegedExceptionAction<Object> notifyAsPrivilegedAction(final HiveEventContext event) {
+        return new PrivilegedExceptionAction<Object>() {
+            @Override
+            public Object run() throws Exception {
+                notifyEntities(event.getMessages());
+                return event;
+            }
+        };
+    }
+
+    private void collect(HiveEventContext event) throws Exception {
 
         assert event.getHookType() == HookContext.HookType.POST_EXEC_HOOK : "Non-POST_EXEC_HOOK not supported!";
 
-        LOG.info("Entered Atlas hook for hook type {} operation {}", event.getHookType(), event.getOperation());
+        LOG.info("Entered Atlas hook for hook type {}, operation {} , user {} as {}", event.getHookType(), event.getOperation(), event.getUgi().getRealUser(), event.getUgi().getShortUserName());
 
         HiveMetaStoreBridge dgiBridge = new HiveMetaStoreBridge(atlasProperties, hiveConf);
 
@@ -270,8 +303,6 @@ public class HiveHook extends AtlasHook implements ExecuteWithHookContext {
 
         default:
         }
-
-        notifyEntities(event.getMessages());
     }
 
     private void deleteTable(HiveMetaStoreBridge dgiBridge, HiveEventContext event) {
@@ -324,16 +355,16 @@ public class HiveHook extends AtlasHook implements ExecuteWithHookContext {
         String changedColStringOldName = oldColList.get(0).getName();
         String changedColStringNewName = changedColStringOldName;
 
-        for (int i = 0; i < oldColList.size(); i++) {
-            if (!newColHashMap.containsKey(oldColList.get(i))) {
-                changedColStringOldName = oldColList.get(i).getName();
+        for (FieldSchema oldCol : oldColList) {
+            if (!newColHashMap.containsKey(oldCol)) {
+                changedColStringOldName = oldCol.getName();
                 break;
             }
         }
 
-        for (int i = 0; i < newColList.size(); i++) {
-            if (!oldColHashMap.containsKey(newColList.get(i))) {
-                changedColStringNewName = newColList.get(i).getName();
+        for (FieldSchema newCol : newColList) {
+            if (!oldColHashMap.containsKey(newCol)) {
+                changedColStringNewName = newCol.getName();
                 break;
             }
         }
@@ -359,7 +390,7 @@ public class HiveHook extends AtlasHook implements ExecuteWithHookContext {
             if (writeEntity.getType() == Type.TABLE) {
                 Table newTable = writeEntity.getTable();
                 createOrUpdateEntities(dgiBridge, event, writeEntity, true, oldTable);
-                final String newQualifiedTableName = dgiBridge.getTableQualifiedName(dgiBridge.getClusterName(),
+                final String newQualifiedTableName = HiveMetaStoreBridge.getTableQualifiedName(dgiBridge.getClusterName(),
                     newTable);
                 String oldColumnQFName = HiveMetaStoreBridge.getColumnQualifiedName(newQualifiedTableName, oldColName);
                 String newColumnQFName = HiveMetaStoreBridge.getColumnQualifiedName(newQualifiedTableName, newColName);
@@ -388,9 +419,9 @@ public class HiveHook extends AtlasHook implements ExecuteWithHookContext {
                 Table newTable = writeEntity.getTable();
                 //Hive sends with both old and new table names in the outputs which is weird. So skipping that with the below check
                 if (!newTable.getDbName().equals(oldTable.getDbName()) || !newTable.getTableName().equals(oldTable.getTableName())) {
-                    final String oldQualifiedName = dgiBridge.getTableQualifiedName(dgiBridge.getClusterName(),
+                    final String oldQualifiedName = HiveMetaStoreBridge.getTableQualifiedName(dgiBridge.getClusterName(),
                         oldTable);
-                    final String newQualifiedName = dgiBridge.getTableQualifiedName(dgiBridge.getClusterName(),
+                    final String newQualifiedName = HiveMetaStoreBridge.getTableQualifiedName(dgiBridge.getClusterName(),
                         newTable);
 
                     //Create/update old table entity - create entity with oldQFNme and old tableName if it doesnt exist. If exists, will update
@@ -399,10 +430,10 @@ public class HiveHook extends AtlasHook implements ExecuteWithHookContext {
                     Referenceable tableEntity = tables.get(Type.TABLE);
 
                     //Reset regular column QF Name to old Name and create a new partial notification request to replace old column QFName to newName to retain any existing traits
-                    replaceColumnQFName(event, (List<Referenceable>) tableEntity.get(HiveDataModelGenerator.COLUMNS), oldQualifiedName, newQualifiedName);
+                    replaceColumnQFName(event, (List<Referenceable>) tableEntity.get(HiveMetaStoreBridge.COLUMNS), oldQualifiedName, newQualifiedName);
 
                     //Reset partition key column QF Name to old Name and create a new partial notification request to replace old column QFName to newName to retain any existing traits
-                    replaceColumnQFName(event, (List<Referenceable>) tableEntity.get(HiveDataModelGenerator.PART_COLS), oldQualifiedName, newQualifiedName);
+                    replaceColumnQFName(event, (List<Referenceable>) tableEntity.get(HiveMetaStoreBridge.PART_COLS), oldQualifiedName, newQualifiedName);
 
                     //Reset SD QF Name to old Name and create a new partial notification request to replace old SD QFName to newName to retain any existing traits
                     replaceSDQFName(event, tableEntity, oldQualifiedName, newQualifiedName);
@@ -425,7 +456,7 @@ public class HiveHook extends AtlasHook implements ExecuteWithHookContext {
 
         ArrayList<String> alias_list = new ArrayList<>();
         alias_list.add(oldTable.getTableName().toLowerCase());
-        newEntity.set(HiveDataModelGenerator.TABLE_ALIAS_LIST, alias_list);
+        newEntity.set(HiveMetaStoreBridge.TABLE_ALIAS_LIST, alias_list);
         event.addMessage(new HookNotification.EntityPartialUpdateRequest(event.getUser(),
             HiveDataTypes.HIVE_TABLE.getName(), AtlasClient.REFERENCEABLE_ATTRIBUTE_NAME,
             oldTableQFName, newEntity));
@@ -454,7 +485,7 @@ public class HiveHook extends AtlasHook implements ExecuteWithHookContext {
 
     private Referenceable replaceSDQFName(final HiveEventContext event, Referenceable tableEntity, final String oldTblQFName, final String newTblQFName) {
         //Reset storage desc QF Name to old Name
-        final Referenceable sdRef = ((Referenceable) tableEntity.get(HiveDataModelGenerator.STORAGE_DESC));
+        final Referenceable sdRef = ((Referenceable) tableEntity.get(HiveMetaStoreBridge.STORAGE_DESC));
         sdRef.set(AtlasClient.REFERENCEABLE_ATTRIBUTE_NAME, HiveMetaStoreBridge.getStorageDescQFName(oldTblQFName));
 
         //Replace SD QF name first to retain tags
@@ -588,7 +619,7 @@ public class HiveHook extends AtlasHook implements ExecuteWithHookContext {
         // filter out select queries which do not modify data
         if (!isSelectQuery) {
 
-            SortedSet<ReadEntity> sortedHiveInputs = new TreeSet<>(entityComparator);;
+            SortedSet<ReadEntity> sortedHiveInputs = new TreeSet<>(entityComparator);
             if ( event.getInputs() != null) {
                 sortedHiveInputs.addAll(event.getInputs());
             }
@@ -608,7 +639,21 @@ public class HiveHook extends AtlasHook implements ExecuteWithHookContext {
 
             if (source.size() > 0 || target.size() > 0) {
                 Referenceable processReferenceable = getProcessReferenceable(dgiBridge, event, sortedHiveInputs, sortedHiveOutputs, source, target);
-                entities.add(processReferenceable);
+                // setup Column Lineage
+                List<Referenceable> sourceList = new ArrayList<>(source.values());
+                List<Referenceable> targetList = new ArrayList<>(target.values());
+                List<Referenceable> colLineageProcessInstances = new ArrayList<>();
+                try {
+                    Map<String, Referenceable> columnQNameToRef =
+                            ColumnLineageUtils.buildColumnReferenceableMap(sourceList, targetList);
+                    colLineageProcessInstances = createColumnLineageProcessInstances(processReferenceable,
+                            event.lineageInfo,
+                            columnQNameToRef);
+                }catch (Exception e){
+                    LOG.warn("Column lineage process setup failed with exception {}", e);
+                }
+                colLineageProcessInstances.add(0, processReferenceable);
+                entities.addAll(colLineageProcessInstances);
                 event.addMessage(new HookNotification.EntityUpdateRequest(event.getUser(), new ArrayList<>(entities)));
             } else {
                 LOG.info("Skipped query {} since it has no getInputs() or resulting getOutputs()", event.getQueryStr());
@@ -621,7 +666,7 @@ public class HiveHook extends AtlasHook implements ExecuteWithHookContext {
     private  <T extends Entity> void processHiveEntity(HiveMetaStoreBridge dgiBridge, HiveEventContext event, T entity, Set<String> dataSetsProcessed,
         SortedMap<T, Referenceable> dataSets, Set<Referenceable> entities) throws Exception {
         if (entity.getType() == Type.TABLE || entity.getType() == Type.PARTITION) {
-            final String tblQFName = dgiBridge.getTableQualifiedName(dgiBridge.getClusterName(), entity.getTable());
+            final String tblQFName = HiveMetaStoreBridge.getTableQualifiedName(dgiBridge.getClusterName(), entity.getTable());
             if (!dataSetsProcessed.contains(tblQFName)) {
                 LinkedHashMap<Type, Referenceable> result = createOrUpdateEntities(dgiBridge, event, entity, false);
                 dataSets.put(entity, result.get(Type.TABLE));
@@ -640,18 +685,6 @@ public class HiveHook extends AtlasHook implements ExecuteWithHookContext {
                     entities.add(hdfsPath);
                 }
             }
-        }
-    }
-
-    private JSONObject getQueryPlan(HiveConf hiveConf, QueryPlan queryPlan) throws Exception {
-        try {
-            ExplainTask explain = new ExplainTask();
-            explain.initialize(hiveConf, queryPlan, null);
-            List<Task<?>> rootTasks = queryPlan.getRootTasks();
-            return explain.getJSONPlan(null, null, rootTasks, queryPlan.getFetchTask(), true, false, false);
-        } catch (Throwable e) {
-            LOG.info("Failed to get queryplan", e);
-            return new JSONObject();
         }
     }
 
@@ -716,14 +749,11 @@ public class HiveHook extends AtlasHook implements ExecuteWithHookContext {
     }
 
     private static boolean isCreateOp(HiveEventContext hiveEvent) {
-        if (HiveOperation.CREATETABLE.equals(hiveEvent.getOperation())
-            || HiveOperation.CREATEVIEW.equals(hiveEvent.getOperation())
-            || HiveOperation.ALTERVIEW_AS.equals(hiveEvent.getOperation())
-            || HiveOperation.ALTERTABLE_LOCATION.equals(hiveEvent.getOperation())
-            || HiveOperation.CREATETABLE_AS_SELECT.equals(hiveEvent.getOperation())) {
-            return true;
-        }
-        return false;
+        return HiveOperation.CREATETABLE.equals(hiveEvent.getOperation())
+                || HiveOperation.CREATEVIEW.equals(hiveEvent.getOperation())
+                || HiveOperation.ALTERVIEW_AS.equals(hiveEvent.getOperation())
+                || HiveOperation.ALTERTABLE_LOCATION.equals(hiveEvent.getOperation())
+                || HiveOperation.CREATETABLE_AS_SELECT.equals(hiveEvent.getOperation());
     }
 
     private Referenceable getProcessReferenceable(HiveMetaStoreBridge dgiBridge, HiveEventContext hiveEvent,
@@ -753,7 +783,7 @@ public class HiveHook extends AtlasHook implements ExecuteWithHookContext {
         processReferenceable.set("userName", hiveEvent.getUser());
         processReferenceable.set("queryText", queryStr);
         processReferenceable.set("queryId", hiveEvent.getQueryId());
-        processReferenceable.set("queryPlan", hiveEvent.getJsonPlan());
+        processReferenceable.set("queryPlan", "Not Supported");
         processReferenceable.set(AtlasConstants.CLUSTER_NAME_ATTRIBUTE, dgiBridge.getClusterName());
 
         List<String> recentQueries = new ArrayList<>(1);
@@ -763,6 +793,51 @@ public class HiveHook extends AtlasHook implements ExecuteWithHookContext {
         processReferenceable.set("endTime", new Date(System.currentTimeMillis()));
         //TODO set queryGraph
         return processReferenceable;
+    }
+
+
+    private List<Referenceable> createColumnLineageProcessInstances(
+            Referenceable processRefObj,
+            Map<String, List<ColumnLineageUtils.HiveColumnLineageInfo>> lineageInfo,
+            Map<String, Referenceable> columnQNameToRef
+    ) {
+        List<Referenceable> l = new ArrayList<>();
+        for(Map.Entry<String, List<ColumnLineageUtils.HiveColumnLineageInfo>> e :
+                lineageInfo.entrySet()) {
+            Referenceable destCol = columnQNameToRef.get(e.getKey());
+            if (destCol == null ) {
+                LOG.debug("Couldn't find output Column {}", e.getKey());
+                continue;
+            }
+            List<Referenceable> outRef = new ArrayList<>();
+            outRef.add(destCol);
+            List<Referenceable> inputRefs = new ArrayList<>();
+            for(ColumnLineageUtils.HiveColumnLineageInfo cLI : e.getValue()) {
+                Referenceable srcCol = columnQNameToRef.get(cLI.inputColumn);
+                if (srcCol == null ) {
+                    LOG.debug("Couldn't find input Column {}", cLI.inputColumn);
+                    continue;
+                }
+                inputRefs.add(srcCol);
+            }
+
+            if (inputRefs.size() > 0 ) {
+                Referenceable r = new Referenceable(HiveDataTypes.HIVE_COLUMN_LINEAGE.getName());
+                r.set("name", processRefObj.get(AtlasClient.NAME) + ":" + outRef.get(0).get(AtlasClient.NAME));
+                r.set(AtlasClient.REFERENCEABLE_ATTRIBUTE_NAME, processRefObj.get(AtlasClient.REFERENCEABLE_ATTRIBUTE_NAME) + ":" + outRef.get(0).get(AtlasClient.NAME));
+                r.set("inputs", inputRefs);
+                r.set("outputs", outRef);
+                r.set("query", processRefObj);
+                r.set("depenendencyType", e.getValue().get(0).depenendencyType);
+                r.set("expression", e.getValue().get(0).expr);
+                l.add(r);
+            }
+            else{
+                LOG.debug("No input references found for lineage of column {}", destCol.get(AtlasClient.REFERENCEABLE_ATTRIBUTE_NAME));
+            }
+        }
+
+        return l;
     }
 
     @VisibleForTesting
@@ -890,8 +965,8 @@ public class HiveHook extends AtlasHook implements ExecuteWithHookContext {
     }
 
     private static boolean addQueryType(HiveOperation op, WriteEntity entity) {
-        if (((WriteEntity) entity).getWriteType() != null && HiveOperation.QUERY.equals(op)) {
-            switch (((WriteEntity) entity).getWriteType()) {
+        if (entity.getWriteType() != null && HiveOperation.QUERY.equals(op)) {
+            switch (entity.getWriteType()) {
             case INSERT:
             case INSERT_OVERWRITE:
             case UPDATE:
@@ -922,6 +997,8 @@ public class HiveHook extends AtlasHook implements ExecuteWithHookContext {
         private String queryStr;
         private Long queryStartTime;
 
+        public Map<String, List<ColumnLineageUtils.HiveColumnLineageInfo>> lineageInfo;
+
         private List<HookNotification.HookNotificationMessage> messages = new ArrayList<>();
 
         private String queryType;
@@ -950,10 +1027,6 @@ public class HiveHook extends AtlasHook implements ExecuteWithHookContext {
             this.hookType = hookType;
         }
 
-        public void setJsonPlan(JSONObject jsonPlan) {
-            this.jsonPlan = jsonPlan;
-        }
-
         public void setQueryId(String queryId) {
             this.queryId = queryId;
         }
@@ -968,6 +1041,15 @@ public class HiveHook extends AtlasHook implements ExecuteWithHookContext {
 
         public void setQueryType(String queryType) {
             this.queryType = queryType;
+        }
+
+        public void setLineageInfo(LineageInfo lineageInfo){
+            try {
+                this.lineageInfo = ColumnLineageUtils.buildLineageMap(lineageInfo);
+                LOG.debug("Column Lineage Map => {} ", this.lineageInfo.entrySet());
+            }catch (Throwable e){
+                LOG.warn("Column Lineage Map build failed with exception {}", e);
+            }
         }
 
         public Set<ReadEntity> getInputs() {
@@ -992,10 +1074,6 @@ public class HiveHook extends AtlasHook implements ExecuteWithHookContext {
 
         public HookContext.HookType getHookType() {
             return hookType;
-        }
-
-        public JSONObject getJsonPlan() {
-            return jsonPlan;
         }
 
         public String getQueryId() {
@@ -1027,7 +1105,13 @@ public class HiveHook extends AtlasHook implements ExecuteWithHookContext {
     static final class EntityComparator implements Comparator<Entity> {
         @Override
         public int compare(Entity o1, Entity o2) {
-            return o1.getName().toLowerCase().compareTo(o2.getName().toLowerCase());
+            String s1 = o1.getName();
+            String s2 = o2.getName();
+            if (s1 == null || s2 == null){
+                s1 = o1.getD().toString();
+                s2 = o2.getD().toString();
+            }
+            return s1.toLowerCase().compareTo(s2.toLowerCase());
         }
     }
 

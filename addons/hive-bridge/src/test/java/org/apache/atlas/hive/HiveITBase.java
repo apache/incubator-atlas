@@ -20,7 +20,6 @@ package org.apache.atlas.hive;
 
 import org.apache.atlas.ApplicationProperties;
 import org.apache.atlas.AtlasClient;
-import org.apache.atlas.fs.model.FSDataTypes;
 import org.apache.atlas.hive.bridge.HiveMetaStoreBridge;
 import org.apache.atlas.hive.hook.HiveHookIT;
 import org.apache.atlas.hive.model.HiveDataTypes;
@@ -93,7 +92,6 @@ public class HiveITBase {
         }
 
         hiveMetaStoreBridge = new HiveMetaStoreBridge(configuration, conf, atlasClient);
-        hiveMetaStoreBridge.registerHiveDataModel();
 
         HiveConf conf = new HiveConf();
         conf.set("hive.exec.post.hooks", "");
@@ -203,7 +201,7 @@ public class HiveITBase {
                 if (System.currentTimeMillis() >= mustEnd) {
                     fail("Assertions failed. Failing after waiting for timeout " + timeout + " msecs", e);
                 }
-                LOG.debug("Waiting up to " + (mustEnd - System.currentTimeMillis()) + " msec as assertion failed", e);
+                LOG.debug("Waiting up to {} msec as assertion failed", mustEnd - System.currentTimeMillis(), e);
                 Thread.sleep(5000);
             }
         }
@@ -217,21 +215,22 @@ public class HiveITBase {
     protected void validateHDFSPaths(Referenceable processReference, String attributeName, String... testPaths) throws Exception {
         List<Id> hdfsPathRefs = (List<Id>) processReference.get(attributeName);
 
-        for (int i = 0; i < testPaths.length; i++) {
-            final String testPathNormed = lower(new Path(testPaths[i]).toString());
+        for (String testPath : testPaths) {
+            final Path path = new Path(testPath);
+            final String testPathNormed = lower(path.toString());
             String hdfsPathId = assertHDFSPathIsRegistered(testPathNormed);
             Assert.assertEquals(hdfsPathRefs.get(0)._getId(), hdfsPathId);
 
             Referenceable hdfsPathRef = atlasClient.getEntity(hdfsPathId);
             Assert.assertEquals(hdfsPathRef.get("path"), testPathNormed);
-            Assert.assertEquals(hdfsPathRef.get(NAME), new Path(testPathNormed).getName());
+            Assert.assertEquals(hdfsPathRef.get(NAME), Path.getPathWithoutSchemeAndAuthority(path).toString().toLowerCase());
             Assert.assertEquals(hdfsPathRef.get(AtlasClient.REFERENCEABLE_ATTRIBUTE_NAME), testPathNormed);
         }
     }
 
     private String assertHDFSPathIsRegistered(String path) throws Exception {
         LOG.debug("Searching for hdfs path {}", path);
-        return assertEntityIsRegistered(FSDataTypes.HDFS_PATH().toString(), AtlasClient.REFERENCEABLE_ATTRIBUTE_NAME, path, null);
+        return assertEntityIsRegistered(HiveMetaStoreBridge.HDFS_PATH, AtlasClient.REFERENCEABLE_ATTRIBUTE_NAME, path, null);
     }
 
     protected String assertDatabaseIsRegistered(String dbName) throws Exception {

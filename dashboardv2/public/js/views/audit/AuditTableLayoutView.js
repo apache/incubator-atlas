@@ -20,8 +20,9 @@ define(['require',
     'backbone',
     'hbs!tmpl/audit/AuditTableLayoutView_tmpl',
     'collection/VEntityList',
-    'utils/Globals'
-], function(require, Backbone, AuditTableLayoutView_tmpl, VEntityList, Globals) {
+    'utils/Enums',
+    'utils/UrlLinks'
+], function(require, Backbone, AuditTableLayoutView_tmpl, VEntityList, Enums, UrlLinks) {
     'use strict';
 
     var AuditTableLayoutView = Backbone.Marionette.LayoutView.extend(
@@ -57,11 +58,11 @@ define(['require',
              * @constructs
              */
             initialize: function(options) {
-                _.extend(this, _.pick(options, 'globalVent', 'guid'));
+                _.extend(this, _.pick(options, 'globalVent', 'guid', 'vent'));
                 this.entityCollection = new VEntityList();
                 this.count = 26;
-                this.entityCollection.url = "/api/atlas/entities/" + this.guid + "/audit";
-                this.entityCollection.modelAttrName = "events"
+                this.entityCollection.url = UrlLinks.entityCollectionaudit(this.guid);
+                this.entityCollection.modelAttrName = "events";
                 this.entityModel = new this.entityCollection.model();
                 this.pervOld = [];
                 this.commonTableOptions = {
@@ -78,6 +79,7 @@ define(['require',
                     paginatorOpts: {}
                 };
                 this.currPage = 1;
+                this.bindEvents();
                 // this.pageFrom = 1;
                 // this.pageTo = this.count;
             },
@@ -89,6 +91,17 @@ define(['require',
                     previous: this.ui.previousAuditData
                 });
                 this.renderTableLayoutView();
+            },
+            bindEvents: function() {
+                var that = this;
+                this.listenTo(this.vent, "reset:collection", function() {
+                    this.fetchCollection({
+                        next: this.ui.nextAuditData,
+                        nextClick: false,
+                        previous: this.ui.previousAuditData
+                    });
+                }, this);
+
             },
             getToOffset: function() {
                 var toOffset = 0;
@@ -147,8 +160,9 @@ define(['require',
                                     options.previous.attr('disabled', true);
                                 }
                             }
-                            that.renderTableLayoutView();
+
                         }
+                        that.renderTableLayoutView();
                     },
                     silent: true
                 });
@@ -162,7 +176,7 @@ define(['require',
                         columns: cols
                     })));
                     if (!(that.entityCollection.models.length < that.count)) {
-                        that.RAuditTableLayoutView.$el.find('table tr').last().hide()
+                        that.RAuditTableLayoutView.$el.find('table tr').last().hide();
                     }
                 });
             },
@@ -193,9 +207,8 @@ define(['require',
                         sortable: false,
                         formatter: _.extend({}, Backgrid.CellFormatter.prototype, {
                             fromRaw: function(rawValue, model) {
-                                that.detailBtnDisable = false;
-                                if (Globals.auditAction[rawValue]) {
-                                    return Globals.auditAction[rawValue];
+                                if (Enums.auditAction[rawValue]) {
+                                    return Enums.auditAction[rawValue];
                                 } else {
                                     return rawValue;
                                 }
@@ -209,7 +222,7 @@ define(['require',
                         sortable: false,
                         formatter: _.extend({}, Backgrid.CellFormatter.prototype, {
                             fromRaw: function(rawValue, model) {
-                                return '<div class="label label-success auditDetailBtn" data-id="auditCreate" data-action="' + Globals.auditAction[model.attributes.action] + '" disabled="' + that.detailBtnDisable + '" data-modalId="' + model.get('eventKey') + '">Detail</div>';
+                                return '<div class="label label-success auditDetailBtn" data-id="auditCreate" data-action="' + Enums.auditAction[model.attributes.action] + '" data-modalId="' + model.get('eventKey') + '">Detail</div>';
                             }
                         })
                     },
@@ -238,7 +251,7 @@ define(['require',
                     });
                     view.$el.on('click', 'td a', function() {
                         modal.trigger('cancel');
-                    })
+                    });
                 });
             },
             onClickNextAuditData: function() {
@@ -246,7 +259,7 @@ define(['require',
                 this.ui.previousAuditData.removeAttr("disabled");
                 $.extend(this.entityCollection.queryParams, {
                     startKey: function() {
-                        return that.next
+                        return that.next;
                     }
                 });
                 this.fetchCollection({
@@ -260,7 +273,7 @@ define(['require',
                 this.ui.nextAuditData.removeAttr("disabled");
                 $.extend(this.entityCollection.queryParams, {
                     startKey: function() {
-                        return that.pervOld.pop()
+                        return that.pervOld.pop();
                     }
                 });
                 this.fetchCollection({

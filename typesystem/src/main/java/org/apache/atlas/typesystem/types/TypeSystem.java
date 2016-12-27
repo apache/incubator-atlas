@@ -20,6 +20,7 @@ package org.apache.atlas.typesystem.types;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
+
 import org.apache.atlas.AtlasException;
 import org.apache.atlas.classification.InterfaceAudience;
 import org.apache.atlas.typesystem.TypesDef;
@@ -30,7 +31,6 @@ import org.apache.atlas.typesystem.types.cache.TypeCache;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.inject.Singleton;
 import java.lang.reflect.Constructor;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -40,6 +40,8 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TimeZone;
 import java.util.concurrent.ConcurrentHashMap;
+
+import javax.inject.Singleton;
 
 @Singleton
 @InterfaceAudience.Private
@@ -311,7 +313,7 @@ public class TypeSystem {
             throw new AtlasException(String.format("Redefinition of type %s not supported", eDef.name));
         }
 
-        EnumType eT = new EnumType(this, eDef.name, eDef.description, eDef.enumValues);
+        EnumType eT = new EnumType(this, eDef.name, eDef.description, eDef.version, eDef.enumValues);
         typeCache.put(eT);
         return eT;
     }
@@ -408,7 +410,7 @@ public class TypeSystem {
                     throw new AtlasException(String.format("Redefinition of type %s not supported", eDef.name));
                 }
 
-                EnumType eT = new EnumType(this, eDef.name, eDef.description, eDef.enumValues);
+                EnumType eT = new EnumType(this, eDef.name, eDef.description, eDef.version, eDef.enumValues);
                 transientTypes.put(eDef.name, eT);
             }
 
@@ -417,7 +419,7 @@ public class TypeSystem {
                 if (!update && isRegistered(sDef.typeName)) {
                     throw new TypeExistsException(String.format("Cannot redefine type %s", sDef.typeName));
                 }
-                StructType sT = new StructType(this, sDef.typeName, sDef.typeDescription, sDef.attributeDefinitions.length);
+                StructType sT = new StructType(this, sDef.typeName, sDef.typeDescription, sDef.typeVersion, sDef.attributeDefinitions.length);
                 structNameToDefMap.put(sDef.typeName, sDef);
                 transientTypes.put(sDef.typeName, sT);
             }
@@ -427,7 +429,7 @@ public class TypeSystem {
                 if (!update && isRegistered(traitDef.typeName)) {
                     throw new TypeExistsException(String.format("Cannot redefine type %s", traitDef.typeName));
                 }
-                TraitType tT = new TraitType(this, traitDef.typeName, traitDef.typeDescription, traitDef.superTypes,
+                TraitType tT = new TraitType(this, traitDef.typeName, traitDef.typeDescription, traitDef.typeVersion, traitDef.superTypes,
                         traitDef.attributeDefinitions.length);
                 traitNameToDefMap.put(traitDef.typeName, traitDef);
                 transientTypes.put(traitDef.typeName, tT);
@@ -439,7 +441,7 @@ public class TypeSystem {
                     throw new TypeExistsException(String.format("Cannot redefine type %s", classDef.typeName));
                 }
 
-                ClassType cT = new ClassType(this, classDef.typeName, classDef.typeDescription, classDef.superTypes,
+                ClassType cT = new ClassType(this, classDef.typeName, classDef.typeDescription, classDef.typeVersion, classDef.superTypes,
                         classDef.attributeDefinitions.length);
                 classNameToDefMap.put(classDef.typeName, classDef);
                 transientTypes.put(classDef.typeName, cT);
@@ -526,7 +528,7 @@ public class TypeSystem {
                 infos[i] = constructAttributeInfo(def.attributeDefinitions[i]);
             }
 
-            StructType type = new StructType(this, def.typeName, def.typeDescription, infos);
+            StructType type = new StructType(this, def.typeName, def.typeDescription, def.typeVersion, infos);
             transientTypes.put(def.typeName, type);
             return type;
         }
@@ -539,9 +541,9 @@ public class TypeSystem {
             }
 
             try {
-                Constructor<U> cons = cls.getDeclaredConstructor(TypeSystem.class, String.class, String.class, ImmutableSet.class,
+                Constructor<U> cons = cls.getDeclaredConstructor(TypeSystem.class, String.class, String.class, String.class, ImmutableSet.class,
                         AttributeInfo[].class);
-                U type = cons.newInstance(this, def.typeName, def.typeDescription, def.superTypes, infos);
+                U type = cons.newInstance(this, def.typeName, def.typeDescription, def.typeVersion, def.superTypes, infos);
                 transientTypes.put(def.typeName, type);
                 return type;
             } catch (Exception e) {

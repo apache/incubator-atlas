@@ -16,24 +16,22 @@
  * limitations under the License.
  */
 
-define(['require', 'backgrid', 'asBreadcrumbs'], function(require) {
+define(['require', 'marionette', 'backgrid', 'asBreadcrumbs', 'jquery-placeholder'], function(require) {
     'use strict';
 
-    $.asBreadcrumbs.prototype.generateChildrenInfo = function() {
-        var self = this;
-        this.$children.each(function() {
-            var $this = $(this);
-            self.childrenInfo.push({
-                $this: $this,
-                outerWidth: $this.outerWidth(),
-                $content: $(self.options.dropdownContent($this))
-            });
-        });
-        if (this.options.overflow === "left") {
-            this.childrenInfo.reverse();
+    Backbone.$.ajaxSetup({
+        cache: false
+    });
+
+    // For placeholder support 
+    if (!('placeholder' in HTMLInputElement.prototype)) {
+        var originalRender = Backbone.Marionette.LayoutView.prototype.render;
+        Backbone.Marionette.LayoutView.prototype.render = function() {
+            originalRender.apply(this, arguments);
+            this.$('input, textarea').placeholder();
         }
-        this.childrenLength = this.childrenInfo.length;
-    };
+    }
+
     String.prototype.trunc = String.prototype.trunc ||
         function(n) {
             return (this.length > n) ? this.substr(0, n - 1) + '...' : this;

@@ -26,6 +26,7 @@ import org.apache.atlas.typesystem.ITypedReferenceableInstance;
 import org.apache.atlas.typesystem.ITypedStruct;
 import org.apache.atlas.typesystem.Referenceable;
 import org.apache.atlas.typesystem.Struct;
+import org.apache.atlas.typesystem.IStruct;
 import org.apache.atlas.typesystem.types.cache.TypeCache;
 import org.codehaus.jettison.json.JSONObject;
 
@@ -100,13 +101,27 @@ public interface MetadataService {
      */
     List<String> createEntities(ITypedReferenceableInstance[] typedInstances) throws AtlasException;
 
+
     /**
      * Return the definition for the given guid.
      *
      * @param guid guid
      * @return entity definition as JSON
      */
-    String getEntityDefinition(String guid) throws AtlasException;
+    String getEntityDefinitionJson(String guid) throws AtlasException;
+
+    ITypedReferenceableInstance getEntityDefinition(String guid) throws AtlasException;
+
+
+    /**
+     * Return the definition given type and attribute. The attribute has to be unique attribute for the type
+     * @param entityType - type name
+     * @param attribute - attribute name
+     * @param value - attribute value
+     * @return
+     * @throws AtlasException
+     */
+    ITypedReferenceableInstance getEntityDefinitionReference(String entityType, String attribute, String value) throws AtlasException;
 
     /**
      * Return the definition given type and attribute. The attribute has to be unique attribute for the type
@@ -153,6 +168,15 @@ public interface MetadataService {
      * @return json array of guids of entities created/updated
      */
     AtlasClient.EntityResult updateEntities(String entityJson) throws AtlasException;
+
+
+    /**
+     * Batch API - Adds/Updates the given entity id(guid).
+     *
+     * @param entityJson entity json
+     * @return json array of guids of entities created/updated
+     */
+    AtlasClient.EntityResult updateEntities(ITypedReferenceableInstance[] iTypedReferenceableInstances) throws AtlasException;
 
     // Trait management functions
 
@@ -213,7 +237,7 @@ public interface MetadataService {
      * @return
      * @throws AtlasException
      */
-    String getTraitDefinition(String guid, String traitName) throws AtlasException;
+    IStruct getTraitDefinition(String guid, String traitName) throws AtlasException;
 
     /**
      * Deletes a given trait from an existing entity represented by a guid.

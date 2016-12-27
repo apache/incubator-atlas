@@ -21,6 +21,8 @@ package org.apache.atlas.typesystem.types;
 import org.codehaus.jettison.json.JSONException;
 import org.codehaus.jettison.json.JSONObject;
 
+import java.util.Objects;
+
 public final class Multiplicity {
 
     public static final Multiplicity OPTIONAL = new Multiplicity(0, 1, false);
@@ -41,40 +43,28 @@ public final class Multiplicity {
         this.isUnique = isUnique;
     }
 
+    public boolean isMany() {
+        return upper > 1;
+    }
+
+    
     public boolean nullAllowed() {
         return lower == 0;
     }
 
     @Override
     public boolean equals(Object o) {
-        if (this == o) {
-            return true;
-        }
-        if (o == null || getClass() != o.getClass()) {
-            return false;
-        }
-
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
         Multiplicity that = (Multiplicity) o;
-
-        if (isUnique != that.isUnique) {
-            return false;
-        }
-        if (lower != that.lower) {
-            return false;
-        }
-        if (upper != that.upper) {
-            return false;
-        }
-
-        return true;
+        return lower == that.lower &&
+                upper == that.upper &&
+                isUnique == that.isUnique;
     }
 
     @Override
     public int hashCode() {
-        int result = lower;
-        result = 31 * result + upper;
-        result = 31 * result + (isUnique ? 1 : 0);
-        return result;
+        return Objects.hash(lower, upper, isUnique);
     }
 
     @Override

@@ -54,6 +54,8 @@ public abstract class AtlasHook {
 
     private static boolean logFailedMessages;
     private static FailedMessagesLogger failedMessagesLogger;
+    private static int notificationRetryInterval;
+    public static final String ATLAS_NOTIFICATION_RETRY_INTERVAL = "atlas.notification.hook.retry.interval";
 
     public static final String ATLAS_NOTIFICATION_FAILED_MESSAGES_FILENAME_KEY =
             "atlas.notification.failed.messages.filename";
@@ -76,6 +78,7 @@ public abstract class AtlasHook {
             failedMessagesLogger.init();
         }
 
+        notificationRetryInterval = atlasProperties.getInt(ATLAS_NOTIFICATION_RETRY_INTERVAL, 1000);
         Injector injector = Guice.createInjector(new NotificationModule());
         notifInterface = injector.getInstance(NotificationInterface.class);
 
@@ -128,7 +131,14 @@ public abstract class AtlasHook {
             } catch (Exception e) {
                 numRetries++;
                 if (numRetries < maxRetries) {
-                    LOG.info("Failed to notify atlas for entity {}. Retrying", message, e);
+                    LOG.error("Failed to send notification - attempt #{}; error={}", numRetries, e.getMessage());
+                    try {
+                        LOG.debug("Sleeping for {} ms before retry", notificationRetryInterval);
+                        Thread.sleep(notificationRetryInterval);
+                    } catch (InterruptedException ie){
+                        LOG.error("Notification hook thread sleep interrupted");
+                    }
+
                 } else {
                     if (shouldLogFailedMessages && e instanceof NotificationException) {
                         List<String> failedMessages = ((NotificationException) e).getFailedMessages();
@@ -179,18 +189,25 @@ public abstract class AtlasHook {
 
     public static String getUser(String userName, UserGroupInformation ugi) {
         if (StringUtils.isNotEmpty(userName)) {
+            if (LOG.isDebugEnabled()) {
+                LOG.debug("Returning userName {}", userName);
+            }
             return userName;
         }
 
         if (ugi != null && StringUtils.isNotEmpty(ugi.getShortUserName())) {
+            if (LOG.isDebugEnabled()) {
+                LOG.debug("Returning ugi.getShortUserName {}", userName);
+            }
             return ugi.getShortUserName();
         }
 
         try {
             return UserGroupInformation.getCurrentUser().getShortUserName();
         } catch (IOException e) {
-            LOG.warn("Failed for UserGroupInformation.getCurrentUser()");
+            LOG.warn("Failed for UserGroupInformation.getCurrentUser() ", e);
             return System.getProperty("user.name");
         }
     }
+
 }

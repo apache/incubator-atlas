@@ -71,11 +71,10 @@
             <artifactId>testng</artifactId>
         </dependency>
 
-        <!-- to bring up atlas server for integration tests -->
         <dependency>
             <groupId>org.apache.atlas</groupId>
-            <artifactId>atlas-webapp</artifactId>
-            <type>war</type>
+            <artifactId>atlas-graphdb-impls</artifactId>
+            <type>pom</type>
             <scope>test</scope>
         </dependency>
 
@@ -95,6 +94,60 @@
 
     <build>
         <plugins>
+            <plugin>
+                <groupId>net.alchim31.maven</groupId>
+                <artifactId>scala-maven-plugin</artifactId>
+                <version>3.2.0</version>
+                <executions>
+                    <execution>
+                        <id>scala-compile-first</id>
+                        <phase>process-resources</phase>
+                        <goals>
+                            <goal>compile</goal>
+                        </goals>
+                    </execution>
+                    <execution>
+                        <id>scala-test-compile-first</id>
+                        <phase>process-test-resources</phase>
+                        <goals>
+                            <goal>testCompile</goal>
+                        </goals>
+                    </execution>
+                </executions>
+                <configuration>
+                    <scalaVersion>${scala.version}</scalaVersion>
+                    <recompileMode>incremental</recompileMode>
+                    <useZincServer>true</useZincServer>
+                    <source>1.7</source>
+                    <target>1.7</target>
+                    <args>
+                        <arg>-unchecked</arg>
+                        <arg>-deprecation</arg>
+                        <arg>-feature</arg>
+                    </args>
+                    <jvmArgs>
+                        <jvmArg>-Xmx512m</jvmArg>
+                        <jvmArg>-XX:MaxPermSize=128m</jvmArg>
+                    </jvmArgs>
+                    <!--
+                    <javacArgs>
+                        <javacArg>-source</javacArg>
+                        <javacArg>${java.version}</javacArg>
+                        <javacArg>-target</javacArg>
+                        <javacArg>${java.version}</javacArg>
+                    </javacArgs>
+                    -->
+                    <!-- The following plugin is required to use quasiquotes in Scala 2.10 and is used
+                         by Spark SQL for code generation. -->
+                    <!--<compilerPlugins>
+                        <compilerPlugin>
+                            <groupId>org.scalamacros</groupId>
+                            <artifactId>paradise_${scala.version}</artifactId>
+                            <version>${scala.macros.version}</version>
+                        </compilerPlugin>
+                    </compilerPlugins>-->
+                </configuration>
+            </plugin>
 
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
@@ -127,24 +180,6 @@
                 <version>1.2.1</version>
                 <inherited>false</inherited>
                 <executions>
-                    <execution>
-                        <configuration>
-                            <mainClass>org.apache.atlas.fs.model.FSDataModelGenerator</mainClass>
-                            <systemProperties>
-                                <systemProperty>
-                                    <key>atlas.conf</key>
-                                    <value>${project.build.directory}/../../../typesystem/src/test/resources/</value>
-                                </systemProperty>
-                            </systemProperties>
-                            <arguments>
-                                <argument>${project.build.directory}/models/fs_model.json</argument>
-                            </arguments>
-                        </configuration>
-                        <phase>package</phase>
-                        <goals>
-                            <goal>java</goal>
-                        </goals>
-                    </execution>
                 </executions>
             </plugin>
 

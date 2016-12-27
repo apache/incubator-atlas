@@ -41,6 +41,9 @@ import org.apache.hadoop.hbase.client.ResultScanner;
 import org.apache.hadoop.hbase.client.Scan;
 import org.apache.hadoop.hbase.client.Table;
 import org.apache.hadoop.hbase.filter.PageFilter;
+import org.apache.hadoop.hbase.io.compress.Compression;
+import org.apache.hadoop.hbase.io.encoding.DataBlockEncoding;
+import org.apache.hadoop.hbase.regionserver.BloomType;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -77,10 +80,10 @@ public class HBaseBasedAuditRepository implements Service, EntityAuditRepository
     public static final String CONFIG_PERSIST_ENTITY_DEFINITION = CONFIG_PREFIX + ".persistEntityDefinition";
 
     public static final byte[] COLUMN_FAMILY = Bytes.toBytes("dt");
-    public static final byte[] COLUMN_ACTION = Bytes.toBytes("action");
-    public static final byte[] COLUMN_DETAIL = Bytes.toBytes("detail");
-    public static final byte[] COLUMN_USER = Bytes.toBytes("user");
-    public static final byte[] COLUMN_DEFINITION = Bytes.toBytes("def");
+    public static final byte[] COLUMN_ACTION = Bytes.toBytes("a");
+    public static final byte[] COLUMN_DETAIL = Bytes.toBytes("d");
+    public static final byte[] COLUMN_USER = Bytes.toBytes("u");
+    public static final byte[] COLUMN_DEFINITION = Bytes.toBytes("f");
 
     private static boolean persistEntityDefinition;
 
@@ -274,6 +277,9 @@ public class HBaseBasedAuditRepository implements Service, EntityAuditRepository
                 HTableDescriptor tableDescriptor = new HTableDescriptor(tableName);
                 HColumnDescriptor columnFamily = new HColumnDescriptor(COLUMN_FAMILY);
                 columnFamily.setMaxVersions(1);
+                columnFamily.setDataBlockEncoding(DataBlockEncoding.FAST_DIFF);
+                columnFamily.setCompressionType(Compression.Algorithm.GZ);
+                columnFamily.setBloomFilterType(BloomType.ROW);
                 tableDescriptor.addFamily(columnFamily);
                 admin.createTable(tableDescriptor);
             } else {

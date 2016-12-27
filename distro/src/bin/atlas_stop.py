@@ -16,10 +16,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import os
-from signal import SIGTERM
+from signal import SIGTERM, SIGKILL
 import sys
 import traceback
-
+import time
 import atlas_config as mc
 
 def main():
@@ -49,6 +49,8 @@ def main():
     os.kill(pid, SIGTERM)
 
     mc.wait_for_shutdown(pid, "stopping atlas", 30)
+    if not mc.exist_pid(pid):
+        print "Apache Atlas Server stopped!!!\n"
 
     # assuming kill worked since process check on windows is more involved...
     if os.path.exists(atlas_pid_file):
@@ -61,6 +63,15 @@ def main():
     # stop hbase
     if mc.is_hbase_local(confdir):
         mc.run_hbase_action(mc.hbaseBinDir(atlas_home), "stop", None, None, True)
+		
+    if mc.exist_pid(pid):
+        #after 30 seconds kill it
+        time.sleep(30)
+        try:
+            sys.stderr.write("did not stop gracefully after 30 seconds seconds: killing with SIGKILL\n")
+            os.kill(pid, SIGKILL)
+        except:
+            pass			
 
 if __name__ == '__main__':
     try:

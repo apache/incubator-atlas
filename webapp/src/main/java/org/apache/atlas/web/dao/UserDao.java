@@ -67,13 +67,12 @@ public class UserDao {
                 inStr = new FileInputStream(PROPERTY_FILE_PATH);
                 userLogins.load(inStr);
             }else {
-                LOG.error("Error while reading user.properties file, filepath="
-                        + PROPERTY_FILE_PATH);
+                LOG.error("Error while reading user.properties file, filepath={}", PROPERTY_FILE_PATH);
             }
 
         } catch (IOException | AtlasException e) {
-            LOG.error("Error while reading user.properties file, filepath="
-                    + PROPERTY_FILE_PATH, e);
+            LOG.error("Error while reading user.properties file, filepath={}", PROPERTY_FILE_PATH, e);
+            throw new RuntimeException(e);
         } finally {
             if(inStr != null) {
                 try {
@@ -99,15 +98,15 @@ public class UserDao {
             role = dataArr[0];
             password = dataArr[1];
         } else {
-            LOG.error("User role credentials is not set properly for " + username);
+            LOG.error("User role credentials is not set properly for {}", username);
             throw new AtlasAuthenticationException("User role credentials is not set properly for " + username );
         }
 
-        List<GrantedAuthority> grantedAuths = new ArrayList<GrantedAuthority>();
+        List<GrantedAuthority> grantedAuths = new ArrayList<>();
         if (StringUtils.hasText(role)) {
             grantedAuths.add(new SimpleGrantedAuthority(role));
         } else {
-            LOG.error("User role credentials is not set properly for " + username);
+            LOG.error("User role credentials is not set properly for {}", username);
             throw new AtlasAuthenticationException("User role credentials is not set properly for " + username );
         }
 
@@ -129,8 +128,8 @@ public class UserDao {
             byte[] hash = digest.digest(base.getBytes("UTF-8"));
             StringBuffer hexString = new StringBuffer();
 
-            for (int i = 0; i < hash.length; i++) {
-                String hex = Integer.toHexString(0xff & hash[i]);
+            for (byte aHash : hash) {
+                String hex = Integer.toHexString(0xff & aHash);
                 if (hex.length() == 1) hexString.append('0');
                 hexString.append(hex);
             }

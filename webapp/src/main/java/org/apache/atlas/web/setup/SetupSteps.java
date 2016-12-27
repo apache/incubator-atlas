@@ -71,14 +71,14 @@ public class SetupSteps {
             LOG.info("Acquired lock for running setup.");
             handleSetupInProgress(configuration, zookeeperProperties);
             for (SetupStep step : setupSteps) {
-                LOG.info("Running setup step: " + step);
+                LOG.info("Running setup step: {}", step);
                 step.run();
             }
             clearSetupInProgress(zookeeperProperties);
         } catch (SetupException se) {
             LOG.error("Got setup exception while trying to setup", se);
             throw se;
-        } catch (Exception e) {
+        } catch (Throwable e) {
             LOG.error("Error running setup steps", e);
             throw new SetupException("Error running setup steps", e);
         } finally {
@@ -147,7 +147,7 @@ public class SetupSteps {
         String serverId = getServerId(configuration);
         ACL acl = AtlasZookeeperSecurityProperties.parseAcl(zookeeperProperties.getAcl(),
                 ZooDefs.Ids.OPEN_ACL_UNSAFE.get(0));
-        List<ACL> acls = Arrays.asList(new ACL[]{acl});
+        List<ACL> acls = Arrays.asList(acl);
 
         CuratorFramework client = curatorFactory.clientInstance();
         try {

@@ -19,6 +19,7 @@
 package org.apache.atlas.web.security;
 
 import org.apache.atlas.AtlasClient;
+import org.apache.atlas.web.TestUtils;
 import org.apache.atlas.web.service.SecureEmbeddedServer;
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.hadoop.conf.Configuration;
@@ -46,6 +47,7 @@ public class SSLTest extends BaseSSLAndKerberosTest {
     private String providerUrl;
     private TestSecureEmbeddedServer secureEmbeddedServer;
     private String originalConf;
+    private String originalHomeDir;
 
     class TestSecureEmbeddedServer extends SecureEmbeddedServer {
 
@@ -74,21 +76,19 @@ public class SSLTest extends BaseSSLAndKerberosTest {
         setupCredentials();
         final PropertiesConfiguration configuration = getSSLConfiguration(providerUrl);
         String persistDir = writeConfiguration(configuration);
-        persistSSLClientConfiguration((org.apache.commons.configuration.Configuration) configuration);
+        persistSSLClientConfiguration(configuration);
 
         originalConf = System.getProperty("atlas.conf");
         System.setProperty("atlas.conf", persistDir);
 
-        atlasClient = new AtlasClient(new String[]{DGI_URL},new String[]{"admin","admin"}) {
-            @Override
-            protected PropertiesConfiguration getClientProperties() {
-                return configuration;
-            }
-        };
+        originalHomeDir = System.getProperty("atlas.home");
+        System.setProperty("atlas.home", TestUtils.getTargetDirectory());
+
+        atlasClient = new AtlasClient(configuration, new String[]{DGI_URL},new String[]{"admin","admin"});
 
         secureEmbeddedServer = new TestSecureEmbeddedServer(21443, getWarPath()) {
             @Override
-            public PropertiesConfiguration getConfiguration() {
+            public org.apache.commons.configuration.Configuration getConfiguration() {
                 return configuration;
             }
         };
@@ -103,6 +103,10 @@ public class SSLTest extends BaseSSLAndKerberosTest {
 
         if (originalConf != null) {
             System.setProperty("atlas.conf", originalConf);
+        }
+
+        if(originalHomeDir !=null){
+            System.setProperty("atlas.home", originalHomeDir);
         }
     }
 

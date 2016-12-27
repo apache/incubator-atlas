@@ -20,13 +20,12 @@ package org.apache.atlas;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
-import com.thinkaurelius.titan.core.TitanGraph;
-import com.thinkaurelius.titan.core.util.TitanCleanup;
 
 import org.apache.atlas.repository.MetadataRepository;
+import org.apache.atlas.repository.graph.AtlasGraphProvider;
 import org.apache.atlas.repository.graph.GraphBackedSearchIndexer;
-import org.apache.atlas.repository.graph.GraphProvider;
 import org.apache.atlas.services.MetadataService;
+import org.apache.atlas.type.AtlasTypeRegistry;
 import org.apache.atlas.typesystem.ITypedReferenceableInstance;
 import org.apache.atlas.typesystem.Referenceable;
 import org.apache.atlas.typesystem.TypesDef;
@@ -45,11 +44,14 @@ import org.apache.atlas.typesystem.types.TypeSystem;
 import org.apache.atlas.typesystem.types.utils.TypesUtil;
 import org.testng.annotations.Guice;
 
-import javax.inject.Inject;
+import static org.apache.atlas.AtlasClient.PROCESS_ATTRIBUTE_INPUTS;
+import static org.apache.atlas.AtlasClient.PROCESS_ATTRIBUTE_OUTPUTS;
 
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
+
+import javax.inject.Inject;
 
 /**
  *  Base Class to set up hive types and instances for tests
@@ -63,29 +65,23 @@ public class BaseRepositoryTest {
     @Inject
     protected MetadataRepository repository;
 
-    @Inject
-    protected GraphProvider<TitanGraph> graphProvider;
 
     protected void setUp() throws Exception {
+        //force graph initialization / built in type registration
+        TestUtils.getGraph();
+        setUpDefaultTypes();
         setUpTypes();
-        new GraphBackedSearchIndexer(graphProvider);
-        RequestContext.createContext();
+        TestUtils.getGraph().commit();
+        new GraphBackedSearchIndexer(new AtlasTypeRegistry());
+        TestUtils.resetRequestContext();
         setupInstances();
-        TestUtils.dumpGraph(graphProvider.get());
+        TestUtils.getGraph().commit();
+        TestUtils.dumpGraph(TestUtils.getGraph());
     }
 
     protected void tearDown() throws Exception {
         TypeSystem.getInstance().reset();
-        try {
-            graphProvider.get().shutdown();
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-        try {
-            TitanCleanup.clear(graphProvider.get());
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
+        AtlasGraphProvider.cleanup();
     }
 
     private void setUpTypes() throws Exception {
@@ -101,6 +97,7 @@ public class BaseRepositoryTest {
     private static final String STORAGE_DESC_TYPE = "StorageDesc";
     private static final String VIEW_TYPE = "View";
     private static final String PARTITION_TYPE = "hive_partition";
+    protected static final String DATASET_SUBTYPE = "dataset_subtype";
 
     TypesDef createTypeDefinitions() {
         HierarchicalTypeDefinition<ClassType> dbClsDef = TypesUtil
@@ -156,7 +153,10 @@ public class BaseRepositoryTest {
             new HierarchicalTypeDefinition<>(ClassType.class, PARTITION_TYPE, null, null,
                 attributeDefinitions);
 
-        HierarchicalTypeDefinition<TraitType> dimTraitDef = TypesUtil.createTraitTypeDef("Dimension", null);
+        HierarchicalTypeDefinition<ClassType> datasetSubTypeClsDef = TypesUtil
+            .createClassTypeDef(DATASET_SUBTYPE, ImmutableSet.of("DataSet"));
+
+                HierarchicalTypeDefinition < TraitType > dimTraitDef = TypesUtil.createTraitTypeDef("Dimension", null);
 
         HierarchicalTypeDefinition<TraitType> factTraitDef = TypesUtil.createTraitTypeDef("Fact", null);
 
@@ -170,9 +170,12 @@ public class BaseRepositoryTest {
 
         HierarchicalTypeDefinition<TraitType> logTraitDef = TypesUtil.createTraitTypeDef("Log Data", null);
 
+        HierarchicalTypeDefinition<TraitType> isaKeywordTraitDef = TypesUtil.createTraitTypeDef("isa", null);
+
         return TypesUtil.getTypesDef(ImmutableList.<EnumTypeDefinition>of(), ImmutableList.<StructTypeDefinition>of(),
-            ImmutableList.of(dimTraitDef, factTraitDef, piiTraitDef, metricTraitDef, etlTraitDef, jdbcTraitDef, logTraitDef),
-            ImmutableList.of(dbClsDef, storageDescClsDef, columnClsDef, tblClsDef, loadProcessClsDef, viewClsDef, partClsDef));
+            ImmutableList.of(dimTraitDef, factTraitDef, piiTraitDef, metricTraitDef, etlTraitDef, jdbcTraitDef, logTraitDef,
+                    isaKeywordTraitDef),
+            ImmutableList.of(dbClsDef, storageDescClsDef, columnClsDef, tblClsDef, loadProcessClsDef, viewClsDef, partClsDef, datasetSubTypeClsDef));
     }
 
     AttributeDefinition attrDef(String name, IDataType dT) {
@@ -280,6 +283,8 @@ public class BaseRepositoryTest {
             ImmutableList.of(loggingFactMonthly), "create table as select ", "plan", "id", "graph", "ETL");
 
         partition(new ArrayList() {{ add("2015-01-01"); }}, salesFactDaily);
+
+        datasetSubType("dataSetSubTypeInst1", "testOwner");
     }
 
     Id database(String name, String description, String owner, String locationUri, String... traitNames)
@@ -320,7 +325,7 @@ public class BaseRepositoryTest {
         List<Referenceable> columns, String... traitNames) throws Exception {
         Referenceable referenceable = new Referenceable(HIVE_TABLE_TYPE, traitNames);
         referenceable.set("name", name);
-        referenceable.set(AtlasClient.REFERENCEABLE_ATTRIBUTE_NAME, name);
+        referenceable.set(AtlasClient.REFERENCEABLE_ATTRIBUTE_NAME, "qualified:" + name);
         referenceable.set("description", description);
         referenceable.set("owner", owner);
         referenceable.set("tableType", tableType);
@@ -379,11 +384,58 @@ public class BaseRepositoryTest {
         ClassType clsType = TypeSystem.getInstance().getDataType(ClassType.class, PARTITION_TYPE);
         return createInstance(referenceable, clsType);
     }
+
+    Id datasetSubType(final String name, String owner) throws Exception {
+        Referenceable referenceable = new Referenceable(DATASET_SUBTYPE);
+        referenceable.set(AtlasClient.REFERENCEABLE_ATTRIBUTE_NAME, name);
+        referenceable.set(AtlasClient.NAME, name);
+        referenceable.set("owner", owner);
+        ClassType clsType = TypeSystem.getInstance().getDataType(ClassType.class, DATASET_SUBTYPE);
+        return createInstance(referenceable, clsType);
+    }
     private Id createInstance(Referenceable referenceable, ClassType clsType) throws Exception {
         ITypedReferenceableInstance typedInstance = clsType.convert(referenceable, Multiplicity.REQUIRED);
         List<String> guids = repository.createEntities(typedInstance);
 
         // return the reference to created instance with guid
         return new Id(guids.get(guids.size() - 1), 0, referenceable.getTypeName());
+    }
+
+    private void setUpDefaultTypes() throws Exception {
+        TypesDef typesDef = createDefaultTypeDefinitions();
+        String typesAsJSON = TypesSerialization.toJson(typesDef);
+        metadataService.createType(typesAsJSON);
+    }
+
+    TypesDef createDefaultTypeDefinitions() {
+        HierarchicalTypeDefinition<ClassType> referenceableType = TypesUtil
+                .createClassTypeDef(AtlasClient.REFERENCEABLE_SUPER_TYPE, ImmutableSet.<String>of(),
+                        new AttributeDefinition(AtlasClient.REFERENCEABLE_ATTRIBUTE_NAME, DataTypes.STRING_TYPE.getName(), Multiplicity.REQUIRED, false, true, true, null));
+
+        HierarchicalTypeDefinition<ClassType> assetType = TypesUtil
+                .createClassTypeDef(AtlasClient.ASSET_TYPE, ImmutableSet.<String>of(),
+                        new AttributeDefinition(AtlasClient.NAME, DataTypes.STRING_TYPE.getName(), Multiplicity.REQUIRED, false, false, true, null),
+                        TypesUtil.createOptionalAttrDef(AtlasClient.DESCRIPTION, DataTypes.STRING_TYPE),
+                        new AttributeDefinition(AtlasClient.OWNER, DataTypes.STRING_TYPE.getName(), Multiplicity.OPTIONAL, false, false, true, null));
+
+        HierarchicalTypeDefinition<ClassType> infraType = TypesUtil
+                .createClassTypeDef(AtlasClient.INFRASTRUCTURE_SUPER_TYPE,
+                        ImmutableSet.of(AtlasClient.REFERENCEABLE_SUPER_TYPE, AtlasClient.ASSET_TYPE));
+
+        HierarchicalTypeDefinition<ClassType> datasetType = TypesUtil
+                .createClassTypeDef(AtlasClient.DATA_SET_SUPER_TYPE,
+                        ImmutableSet.of(AtlasClient.REFERENCEABLE_SUPER_TYPE, AtlasClient.ASSET_TYPE));
+
+        HierarchicalTypeDefinition<ClassType> processType = TypesUtil
+                .createClassTypeDef(AtlasClient.PROCESS_SUPER_TYPE,
+                        ImmutableSet.of(AtlasClient.REFERENCEABLE_SUPER_TYPE, AtlasClient.ASSET_TYPE),
+                        new AttributeDefinition(PROCESS_ATTRIBUTE_INPUTS, DataTypes.arrayTypeName(AtlasClient.DATA_SET_SUPER_TYPE),
+                                Multiplicity.OPTIONAL, false, null),
+                        new AttributeDefinition(PROCESS_ATTRIBUTE_OUTPUTS, DataTypes.arrayTypeName(AtlasClient.DATA_SET_SUPER_TYPE),
+                                Multiplicity.OPTIONAL, false, null));
+
+        return TypesUtil.getTypesDef(ImmutableList.<EnumTypeDefinition>of(), ImmutableList.<StructTypeDefinition>of(),
+                ImmutableList.<HierarchicalTypeDefinition<TraitType>>of(),
+                ImmutableList.of(referenceableType, assetType, infraType, datasetType, processType));
     }
 }

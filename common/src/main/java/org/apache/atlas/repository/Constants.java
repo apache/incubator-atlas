@@ -54,6 +54,8 @@ public final class Constants {
     public static final String VERTEX_TYPE_PROPERTY_KEY = INTERNAL_PROPERTY_KEY_PREFIX + "type";
     public static final String TYPENAME_PROPERTY_KEY = INTERNAL_PROPERTY_KEY_PREFIX + "type.name";
     public static final String TYPEDESCRIPTION_PROPERTY_KEY = INTERNAL_PROPERTY_KEY_PREFIX + "type.description";
+    public static final String TYPEVERSION_PROPERTY_KEY = INTERNAL_PROPERTY_KEY_PREFIX + "type.version";
+    public static final String TYPEOPTIONS_PROPERTY_KEY = INTERNAL_PROPERTY_KEY_PREFIX + "type.options";
 
     /**
      * Trait names property key and index name.
@@ -62,6 +64,8 @@ public final class Constants {
 
     public static final String VERSION_PROPERTY_KEY = INTERNAL_PROPERTY_KEY_PREFIX + "version";
     public static final String STATE_PROPERTY_KEY = INTERNAL_PROPERTY_KEY_PREFIX + "state";
+    public static final String CREATED_BY_KEY = INTERNAL_PROPERTY_KEY_PREFIX + "createdBy";
+    public static final String MODIFIED_BY_KEY = INTERNAL_PROPERTY_KEY_PREFIX + "modifiedBy";
 
     public static final String TIMESTAMP_PROPERTY_KEY = INTERNAL_PROPERTY_KEY_PREFIX + "timestamp";
 
@@ -85,6 +89,10 @@ public final class Constants {
 
     public static final String FULLTEXT_INDEX = "fulltext_index";
 
+    public static final String QUALIFIED_NAME = "Referenceable.qualifiedName";
+    public static final String TYPE_NAME_PROPERTY_KEY = INTERNAL_PROPERTY_KEY_PREFIX + "typeName";
+
     private Constants() {
     }
+
 }

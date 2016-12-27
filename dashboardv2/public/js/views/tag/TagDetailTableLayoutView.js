@@ -61,9 +61,9 @@ define(['require',
              */
             initialize: function(options) {
                 _.extend(this, _.pick(options, 'globalVent', 'collection', 'guid', 'term', 'assetName'));
-                this.collectionObject = this.collection.toJSON();
+                this.collectionObject = this.collection.first().toJSON();
                 this.tagTermCollection = new VTagList();
-                var tagorterm = _.toArray(this.collectionObject[0].traits),
+                var tagorterm = _.toArray(this.collectionObject.classifications),
                     tagTermList = [],
                     that = this;
                 _.each(tagorterm, function(object) {
@@ -130,13 +130,13 @@ define(['require',
                             sortable: false,
                             formatter: _.extend({}, Backgrid.CellFormatter.prototype, {
                                 fromRaw: function(rawValue, model) {
-                                    var values = model.get('values'),
+                                    var values = model.get('attributes'),
                                         tagValue = 'NA';
                                     if (!_.isEmpty(values)) {
                                         var stringArr = [];
                                         tagValue = "";
                                         _.each(values, function(val, key) {
-                                            var attrName = "<span>" + key + ":" + val + "</span>";
+                                            var attrName = "<span>" + _.escape(key) + ":" + _.escape(val) + "</span>";
                                             stringArr.push(attrName);
                                         });
                                         tagValue += stringArr.join(", ");
@@ -178,13 +178,13 @@ define(['require',
                     that = this;
                 if (that.term) {
                     var modal = CommonViewFunction.deleteTagModel({
-                        msg: "<div class='ellipsis'>Remove: " + "<b>" + tagName + "</b> assignment from" + " " + "<b>" + this.assetName + "?</b></div>",
+                        msg: "<div class='ellipsis'>Remove: " + "<b>" + _.escape(tagName) + "</b> assignment from" + " " + "<b>" + this.assetName + "?</b></div>",
                         titleMessage: Messages.removeTerm,
                         buttonText: "Remove",
                     });
                 } else {
                     var modal = CommonViewFunction.deleteTagModel({
-                        msg: "<div class='ellipsis'>Remove: " + "<b>" + tagName + "</b> assignment from" + " " + "<b>" + this.assetName + "?</b></div>",
+                        msg: "<div class='ellipsis'>Remove: " + "<b>" + _.escape(tagName) + "</b> assignment from" + " " + "<b>" + this.assetName + "?</b></div>",
                         titleMessage: Messages.removeTag,
                         buttonText: "Remove",
                     });

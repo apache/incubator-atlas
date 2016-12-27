@@ -34,5 +34,6 @@
         <module>api</module>
         <module>titan0</module>
         <module>common</module>
+        <module>graphdb-impls</module>
     </modules>
 </project>

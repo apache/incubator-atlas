@@ -23,22 +23,14 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.UnmodifiableIterator;
 
+import org.apache.atlas.AtlasConstants;
 import org.apache.atlas.AtlasException;
 import org.apache.atlas.typesystem.IStruct;
 import org.apache.atlas.typesystem.persistence.DownCastStructInstance;
 import org.apache.atlas.typesystem.types.TypeUtils.Pair;
 
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.LinkedHashMap;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Map;
-import java.util.Queue;
-import java.util.Set;
+import java.util.*;
 
 /**
  * Represents a Type that can have SuperTypes. An Instance of the HierarchicalType can be
@@ -70,7 +62,12 @@ public abstract class HierarchicalType<ST extends HierarchicalType, T> extends A
      */
     HierarchicalType(TypeSystem typeSystem, Class<ST> superTypeClass, String name, String description, ImmutableSet<String> superTypes,
             int numFields) {
-        super(name, description);
+        this( typeSystem, superTypeClass, name, description, AtlasConstants.DEFAULT_TYPE_VERSION, superTypes, numFields);
+    }
+
+    HierarchicalType(TypeSystem typeSystem, Class<ST> superTypeClass, String name, String description, String version, ImmutableSet<String> superTypes,
+                     int numFields) {
+        super(name, description, version);
         this.typeSystem = typeSystem;
         this.superTypeClass = superTypeClass;
         this.fieldMapping = null;
@@ -86,7 +83,12 @@ public abstract class HierarchicalType<ST extends HierarchicalType, T> extends A
     }
     HierarchicalType(TypeSystem typeSystem, Class<ST> superTypeClass, String name, String description, ImmutableSet<String> superTypes,
             AttributeInfo... fields) throws AtlasException {
-        super(name, description);
+        this(typeSystem, superTypeClass, name, description, AtlasConstants.DEFAULT_TYPE_VERSION, superTypes, fields);
+    }
+
+    HierarchicalType(TypeSystem typeSystem, Class<ST> superTypeClass, String name, String description, String version, ImmutableSet<String> superTypes,
+                     AttributeInfo... fields) throws AtlasException {
+        super(name, description, version);
         this.typeSystem = typeSystem;
         this.superTypeClass = superTypeClass;
         Pair<FieldMapping, ImmutableMap<String, String>> p = constructFieldMapping(superTypes, fields);
@@ -142,21 +144,21 @@ public abstract class HierarchicalType<ST extends HierarchicalType, T> extends A
     }
 
     private void setupSuperTypesGraph(ImmutableSet<String> superTypes) throws AtlasException {
-        Map<String, List<Path>> superTypePaths = new HashMap<String, List<Path>>();
-        Map<String, Path> pathNameToPathMap = new HashMap<String, Path>();
-        Queue<Path> queue = new LinkedList<Path>();
+        Map<String, List<Path>> superTypePaths = new HashMap<>();
+        Map<String, Path> pathNameToPathMap = new HashMap<>();
+        Queue<Path> queue = new LinkedList<>();
         queue.add(new Node(getName()));
         while (!queue.isEmpty()) {
             Path currentPath = queue.poll();
 
-            ST superType = currentPath.typeName == getName() ? (ST) this :
-                    (ST) typeSystem.getDataType(superTypeClass, currentPath.typeName);
+            ST superType = Objects.equals(currentPath.typeName, getName()) ? (ST) this :
+                    typeSystem.getDataType(superTypeClass, currentPath.typeName);
 
             pathNameToPathMap.put(currentPath.pathName, currentPath);
             if (superType != this) {
                 List<Path> typePaths = superTypePaths.get(superType.getName());
                 if (typePaths == null) {
-                    typePaths = new ArrayList<Path>();
+                    typePaths = new ArrayList<>();
                     superTypePaths.put(superType.getName(), typePaths);
                 }
                 typePaths.add(currentPath);
@@ -206,13 +208,13 @@ public abstract class HierarchicalType<ST extends HierarchicalType, T> extends A
         while (pathItr.hasNext()) {
             Path currentPath = pathItr.next();
 
-            ST superType = currentPath.typeName == getName() ? (ST) this :
-                    (ST) typeSystem.getDataType(superTypeClass, currentPath.typeName);
+            ST superType = Objects.equals(currentPath.typeName, getName()) ? (ST) this :
+                    typeSystem.getDataType(superTypeClass, currentPath.typeName);
 
             ImmutableList<AttributeInfo> superTypeFields =
                     superType == this ? ImmutableList.copyOf(fields) : superType.immediateAttrs;
 
-            Set<String> immediateFields = new HashSet<String>();
+            Set<String> immediateFields = new HashSet<>();
 
             for (AttributeInfo i : superTypeFields) {
                 if (superType == this) {
@@ -304,7 +306,7 @@ public abstract class HierarchicalType<ST extends HierarchicalType, T> extends A
         }
 
         if (s != null) {
-            if (s.getTypeName() != getName()) {
+            if (!Objects.equals(s.getTypeName(), getName())) {
                 throw new AtlasException(
                         String.format("Downcast called on wrong type %s, instance type is %s", getName(),
                                 s.getTypeName()));
@@ -317,7 +319,7 @@ public abstract class HierarchicalType<ST extends HierarchicalType, T> extends A
                         superTypeName, getName()));
             }
 
-            ST superType = (ST) typeSystem.getDataType(superTypeClass, superTypeName);
+            ST superType = typeSystem.getDataType(superTypeClass, superTypeName);
             Map<String, String> downCastMap = superType.constructDowncastFieldMap(this, pathToSuper.get(0));
             return new DownCastStructInstance(superTypeName, new DownCastFieldMapping(ImmutableMap.copyOf(downCastMap)),
                     s);
@@ -348,7 +350,7 @@ public abstract class HierarchicalType<ST extends HierarchicalType, T> extends A
         /*
          * the downcastMap;
          */
-        Map<String, String> dCMap = new HashMap<String, String>();
+        Map<String, String> dCMap = new HashMap<>();
         Iterator<Path> itr = pathIterator();
         while (itr.hasNext()) {
             Path p = itr.next();
@@ -505,7 +507,7 @@ public abstract class HierarchicalType<ST extends HierarchicalType, T> extends A
         Queue<Path> pathQueue;
 
         PathItr() {
-            pathQueue = new LinkedList<Path>();
+            pathQueue = new LinkedList<>();
             pathQueue.add(pathNameToPathMap.get(getName()));
         }
 
@@ -521,13 +523,12 @@ public abstract class HierarchicalType<ST extends HierarchicalType, T> extends A
             if(p != null) {
                 ST t = null;
                 try {
-                    t = (ST) typeSystem.getDataType(superTypeClass, p.typeName);
+                    t = typeSystem.getDataType(superTypeClass, p.typeName);
                 } catch (AtlasException me) {
                     throw new RuntimeException(me);
                 }
                 if (t.superTypes != null) {
-                    ImmutableSet<String> sTs = t.superTypes;
-                    for (String sT : sTs) {
+                    for (String sT : (ImmutableSet<String>) t.superTypes) {
                         String nm = sT + "." + p.pathName;
                         pathQueue.add(pathNameToPathMap.get(nm));
                     }

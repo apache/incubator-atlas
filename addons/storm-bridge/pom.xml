@@ -95,11 +95,10 @@
             <groupId>org.apache.storm</groupId>
             <artifactId>storm-core</artifactId>
             <version>${storm.version}</version>
-            <type>jar</type>
             <exclusions>
                 <exclusion>
                     <groupId>org.slf4j</groupId>
-                    <artifactId>slf4j-log4j12</artifactId>
+                    <artifactId>log4j-over-slf4j</artifactId>
                 </exclusion>
             </exclusions>
         </dependency>
@@ -117,6 +116,14 @@
         </dependency>
 
         <!-- to bring up atlas server for integration tests -->
+
+        <dependency>
+            <groupId>org.apache.atlas</groupId>
+            <artifactId>atlas-graphdb-impls</artifactId>
+            <type>pom</type>
+            <scope>test</scope>
+        </dependency>
+
         <dependency>
             <groupId>org.apache.atlas</groupId>
             <artifactId>atlas-webapp</artifactId>
@@ -132,233 +139,273 @@
         </dependency>
     </dependencies>
 
+    <profiles>
+        <profile>
+            <id>dist</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-dependency-plugin</artifactId>
+                        <executions>
+                            <execution>
+                                <id>copy-hook</id>
+                                <phase>package</phase>
+                                <goals>
+                                    <goal>copy</goal>
+                                </goals>
+                                <configuration>
+                                    <outputDirectory>${project.build.directory}/dependency/hook/storm/atlas-storm-plugin-impl</outputDirectory>
+                                    <overWriteReleases>false</overWriteReleases>
+                                    <overWriteSnapshots>false</overWriteSnapshots>
+                                    <overWriteIfNewer>true</overWriteIfNewer>
+                                    <artifactItems>
+                                        <artifactItem>
+                                            <groupId>${project.groupId}</groupId>
+                                            <artifactId>${project.artifactId}</artifactId>
+                                            <version>${project.version}</version>
+                                        </artifactItem>
+                                        <artifactItem>
+                                            <groupId>org.json4s</groupId>
+                                            <artifactId>json4s-native_${scala.binary.version}</artifactId>
+                                            <version>${json.version}</version>
+                                        </artifactItem>
+                                        <artifactItem>
+                                            <groupId>org.json4s</groupId>
+                                            <artifactId>json4s-core_${scala.binary.version}</artifactId>
+                                            <version>${json.version}</version>
+                                        </artifactItem>
+                                        <artifactItem>
+                                            <groupId>org.json4s</groupId>
+                                            <artifactId>json4s-ast_${scala.binary.version}</artifactId>
+                                            <version>${json.version}</version>
+                                        </artifactItem>
+                                        <artifactItem>
+                                            <groupId>${project.groupId}</groupId>
+                                            <artifactId>atlas-client</artifactId>
+                                            <version>${project.version}</version>
+                                        </artifactItem>
+                                        <artifactItem>
+                                            <groupId>${project.groupId}</groupId>
+                                            <artifactId>atlas-typesystem</artifactId>
+                                            <version>${project.version}</version>
+                                        </artifactItem>
+                                        <artifactItem>
+                                            <groupId>${project.groupId}</groupId>
+                                            <artifactId>hive-bridge</artifactId>
+                                            <version>${project.version}</version>
+                                        </artifactItem>
+                                        <artifactItem>
+                                            <groupId>${project.groupId}</groupId>
+                                            <artifactId>atlas-notification</artifactId>
+                                            <version>${project.version}</version>
+                                        </artifactItem>
+                                        <artifactItem>
+                                            <groupId>${project.groupId}</groupId>
+                                            <artifactId>atlas-common</artifactId>
+                                            <version>${project.version}</version>
+                                        </artifactItem>
+                                        <artifactItem>
+                                            <groupId>${project.groupId}</groupId>
+                                            <artifactId>hdfs-model</artifactId>
+                                            <version>${project.version}</version>
+                                        </artifactItem>
+                                        <artifactItem>
+                                            <groupId>org.scala-lang</groupId>
+                                            <artifactId>scala-compiler</artifactId>
+                                            <version>${scala.version}</version>
+                                        </artifactItem>
+                                        <artifactItem>
+                                            <groupId>org.scala-lang</groupId>
+                                            <artifactId>scala-reflect</artifactId>
+                                            <version>${scala.version}</version>
+                                        </artifactItem>
+                                        <artifactItem>
+                                            <groupId>org.scala-lang</groupId>
+                                            <artifactId>scala-library</artifactId>
+                                            <version>${scala.version}</version>
+                                        </artifactItem>
+                                        <artifactItem>
+                                            <groupId>org.scala-lang</groupId>
+                                            <artifactId>scalap</artifactId>
+                                            <version>${scala.version}</version>
+                                        </artifactItem>
+                                        <artifactItem>
+                                            <groupId>com.google.inject</groupId>
+                                            <artifactId>guice</artifactId>
+                                        </artifactItem>
+                                        <artifactItem>
+                                            <groupId>com.google.inject.extensions</groupId>
+                                            <artifactId>guice-multibindings</artifactId>
+                                        </artifactItem>
+                                        <artifactItem>
+                                            <groupId>com.google.inject.extensions</groupId>
+                                            <artifactId>guice-servlet</artifactId>
+                                        </artifactItem>
+                                        <artifactItem>
+                                            <groupId>com.google.inject.extensions</groupId>
+                                            <artifactId>guice-throwingproviders</artifactId>
+                                        </artifactItem>
+                                        <artifactItem>
+                                            <groupId>org.apache.kafka</groupId>
+                                            <artifactId>kafka_${scala.binary.version}</artifactId>
+                                            <version>${kafka.version}</version>
+                                        </artifactItem>
+                                        <artifactItem>
+                                            <groupId>org.apache.kafka</groupId>
+                                            <artifactId>kafka-clients</artifactId>
+                                            <version>${kafka.version}</version>
+                                        </artifactItem>
+                                        <artifactItem>
+                                            <groupId>aopalliance</groupId>
+                                            <artifactId>aopalliance</artifactId>
+                                            <version>${aopalliance.version}</version>
+                                        </artifactItem>
+                                        <artifactItem>
+                                            <groupId>commons-configuration</groupId>
+                                            <artifactId>commons-configuration</artifactId>
+                                            <version>${commons-conf.version}</version>
+                                        </artifactItem>
+                                        <artifactItem>
+                                            <groupId>commons-logging</groupId>
+                                            <artifactId>commons-logging</artifactId>
+                                            <version>${commons-logging.version}</version>
+                                        </artifactItem>
+                                        <artifactItem>
+                                            <groupId>javax.inject</groupId>
+                                            <artifactId>javax.inject</artifactId>
+                                            <version>${javax-inject.version}</version>
+                                        </artifactItem>
+                                        <artifactItem>
+                                            <groupId>org.codehaus.jettison</groupId>
+                                            <artifactId>jettison</artifactId>
+                                            <version>${jettison.version}</version>
+                                        </artifactItem>
+                                        <artifactItem>
+                                            <groupId>org.codehaus.jettison</groupId>
+                                            <artifactId>jettison</artifactId>
+                                            <version>${jettison.version}</version>
+                                        </artifactItem>
+                                        <artifactItem>
+                                            <groupId>com.thoughtworks.paranamer</groupId>
+                                            <artifactId>paranamer</artifactId>
+                                            <version>${paranamer.version}</version>
+                                        </artifactItem>
+                                        <artifactItem>
+                                            <groupId>org.apache.hive</groupId>
+                                            <artifactId>hive-exec</artifactId>
+                                            <version>${hive.version}</version>
+                                        </artifactItem>
+                                        <artifactItem>
+                                            <groupId>org.apache.hbase</groupId>
+                                            <artifactId>hbase-common</artifactId>
+                                            <version>${hbase.version}</version>
+                                        </artifactItem>
+                                        <artifactItem>
+                                            <groupId>org.apache.hadoop</groupId>
+                                            <artifactId>hadoop-common</artifactId>
+                                            <version>${hadoop.version}</version>
+                                        </artifactItem>
+                                        <artifactItem>
+                                            <groupId>com.google.code.gson</groupId>
+                                            <artifactId>gson</artifactId>
+                                            <version>${gson.version}</version>
+                                        </artifactItem>
+                                        <artifactItem>
+                                            <groupId>log4j</groupId>
+                                            <artifactId>log4j</artifactId>
+                                            <version>${log4j.version}</version>
+                                        </artifactItem>
+                                    </artifactItems>
+                                </configuration>
+                            </execution>
+                            <execution>
+                                <id>copy-hook-shim</id>
+                                <phase>package</phase>
+                                <goals>
+                                    <goal>copy</goal>
+                                </goals>
+                                <configuration>
+                                    <outputDirectory>${project.build.directory}/dependency/hook/storm</outputDirectory>
+                                    <overWriteReleases>false</overWriteReleases>
+                                    <overWriteSnapshots>false</overWriteSnapshots>
+                                    <overWriteIfNewer>true</overWriteIfNewer>
+                                    <artifactItems>
+                                        <artifactItem>
+                                            <groupId>${project.groupId}</groupId>
+                                            <artifactId>storm-bridge-shim</artifactId>
+                                            <version>${project.version}</version>
+                                        </artifactItem>
+                                        <artifactItem>
+                                            <groupId>${project.groupId}</groupId>
+                                            <artifactId>atlas-plugin-classloader</artifactId>
+                                            <version>${project.version}</version>
+                                        </artifactItem>
+                                    </artifactItems>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
+
     <build>
         <plugins>
             <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-dependency-plugin</artifactId>
+                <groupId>net.alchim31.maven</groupId>
+                <artifactId>scala-maven-plugin</artifactId>
+                <version>3.2.0</version>
                 <executions>
                     <execution>
-                        <id>copy-hook</id>
-                        <phase>package</phase>
+                        <id>scala-compile-first</id>
+                        <phase>process-resources</phase>
                         <goals>
-                            <goal>copy</goal>
+                            <goal>compile</goal>
                         </goals>
-                        <configuration>
-                            <outputDirectory>${project.build.directory}/dependency/hook/storm/atlas-storm-plugin-impl</outputDirectory>
-                            <overWriteReleases>false</overWriteReleases>
-                            <overWriteSnapshots>false</overWriteSnapshots>
-                            <overWriteIfNewer>true</overWriteIfNewer>
-                            <artifactItems>
-                                <artifactItem>
-                                    <groupId>${project.groupId}</groupId>
-                                    <artifactId>${project.artifactId}</artifactId>
-                                    <version>${project.version}</version>
-                                </artifactItem>
-                                <artifactItem>
-                                    <groupId>org.json4s</groupId>
-                                    <artifactId>json4s-native_2.10</artifactId>
-                                    <version>${json.version}</version>
-                                </artifactItem>
-                                <artifactItem>
-                                    <groupId>org.json4s</groupId>
-                                    <artifactId>json4s-core_2.10</artifactId>
-                                    <version>${json.version}</version>
-                                </artifactItem>
-                                <artifactItem>
-                                    <groupId>org.json4s</groupId>
-                                    <artifactId>json4s-ast_2.10</artifactId>
-                                    <version>${json.version}</version>
-                                </artifactItem>
-                                <artifactItem>
-                                    <groupId>${project.groupId}</groupId>
-                                    <artifactId>atlas-client</artifactId>
-                                    <version>${project.version}</version>
-                                </artifactItem>
-                                <artifactItem>
-                                    <groupId>${project.groupId}</groupId>
-                                    <artifactId>atlas-typesystem</artifactId>
-                                    <version>${project.version}</version>
-                                </artifactItem>
-                                <artifactItem>
-                                    <groupId>${project.groupId}</groupId>
-                                    <artifactId>hive-bridge</artifactId>
-                                    <version>${project.version}</version>
-                                </artifactItem>
-                                <artifactItem>
-                                    <groupId>${project.groupId}</groupId>
-                                    <artifactId>atlas-notification</artifactId>
-                                    <version>${project.version}</version>
-                                </artifactItem>
-                                <artifactItem>
-                                    <groupId>${project.groupId}</groupId>
-                                    <artifactId>atlas-common</artifactId>
-                                    <version>${project.version}</version>
-                                </artifactItem>
-                                <artifactItem>
-                                    <groupId>${project.groupId}</groupId>
-                                    <artifactId>hdfs-model</artifactId>
-                                    <version>${project.version}</version>
-                                </artifactItem>
-                                <artifactItem>
-                                    <groupId>org.scala-lang</groupId>
-                                    <artifactId>scala-compiler</artifactId>
-                                    <version>${scala.version}</version>
-                                </artifactItem>
-                                <artifactItem>
-                                    <groupId>org.scala-lang</groupId>
-                                    <artifactId>scala-reflect</artifactId>
-                                    <version>${scala.version}</version>
-                                </artifactItem>
-                                <artifactItem>
-                                    <groupId>org.scala-lang</groupId>
-                                    <artifactId>scala-library</artifactId>
-                                    <version>${scala.version}</version>
-                                </artifactItem>
-                                <artifactItem>
-                                    <groupId>org.scala-lang</groupId>
-                                    <artifactId>scalap</artifactId>
-                                    <version>${scala.version}</version>
-                                </artifactItem>
-                                <artifactItem>
-                                    <groupId>com.google.inject</groupId>
-                                    <artifactId>guice</artifactId>
-                                    <version>${guice.version}</version>
-                                </artifactItem>
-                                <artifactItem>
-                                    <groupId>com.google.inject.extensions</groupId>
-                                    <artifactId>guice-multibindings</artifactId>
-                                    <version>${guice.version}</version>
-                                </artifactItem>
-                                <artifactItem>
-                                    <groupId>com.google.inject.extensions</groupId>
-                                    <artifactId>guice-servlet</artifactId>
-                                    <version>${guice.version}</version>
-                                </artifactItem>
-                                <artifactItem>
-                                    <groupId>com.google.inject.extensions</groupId>
-                                    <artifactId>guice-throwingproviders</artifactId>
-                                    <version>${guice.version}</version>
-                                </artifactItem>
-                                <artifactItem>
-                                    <groupId>org.apache.kafka</groupId>
-                                    <artifactId>kafka_${scala.binary.version}</artifactId>
-                                    <version>${kafka.version}</version>
-                                </artifactItem>
-                                <artifactItem>
-                                    <groupId>org.apache.kafka</groupId>
-                                    <artifactId>kafka-clients</artifactId>
-                                    <version>${kafka.version}</version>
-                                </artifactItem>
-                                <artifactItem>
-                                    <groupId>aopalliance</groupId>
-                                    <artifactId>aopalliance</artifactId>
-                                    <version>${aopalliance.version}</version>
-                                </artifactItem>
-                                <artifactItem>
-                                    <groupId>commons-configuration</groupId>
-                                    <artifactId>commons-configuration</artifactId>
-                                    <version>${commons-conf.version}</version>
-                                </artifactItem>
-                                <artifactItem>
-                                    <groupId>commons-logging</groupId>
-                                    <artifactId>commons-logging</artifactId>
-                                    <version>${commons-logging.version}</version>
-                                </artifactItem>
-                                <artifactItem>
-                                    <groupId>javax.inject</groupId>
-                                    <artifactId>javax.inject</artifactId>
-                                    <version>${javax-inject.version}</version>
-                                </artifactItem>
-                                <artifactItem>
-                                    <groupId>org.codehaus.jettison</groupId>
-                                    <artifactId>jettison</artifactId>
-                                    <version>${jettison.version}</version>
-                                </artifactItem>
-                                <artifactItem>
-                                    <groupId>org.codehaus.jettison</groupId>
-                                    <artifactId>jettison</artifactId>
-                                    <version>${jettison.version}</version>
-                                </artifactItem>
-                                <artifactItem>
-                                    <groupId>org.json4s</groupId>
-                                    <artifactId>json4s-ast_2.10</artifactId>
-                                    <version>${json.version}</version>
-                                </artifactItem>
-                                <artifactItem>
-                                    <groupId>org.json4s</groupId>
-                                    <artifactId>json4s-core_2.10</artifactId>
-                                    <version>${json.version}</version>
-                                </artifactItem>
-                                <artifactItem>
-                                    <groupId>org.json4s</groupId>
-                                    <artifactId>json4s-native_2.10</artifactId>
-                                    <version>${json.version}</version>
-                                </artifactItem>
-                                <artifactItem>
-                                    <groupId>org.json4s</groupId>
-                                    <artifactId>json4s-native_2.10</artifactId>
-                                    <version>${json.version}</version>
-                                </artifactItem>
-                                <artifactItem>
-                                    <groupId>com.thoughtworks.paranamer</groupId>
-                                    <artifactId>paranamer</artifactId>
-                                    <version>${paranamer.version}</version>
-                                </artifactItem>
-                                <artifactItem>
-                                    <groupId>org.apache.hive</groupId>
-                                    <artifactId>hive-exec</artifactId>
-                                    <version>${hive.version}</version>
-                                </artifactItem>
-                                <artifactItem>
-                                    <groupId>org.apache.hbase</groupId>
-                                    <artifactId>hbase-common</artifactId>
-                                    <version>${hbase.version}</version>
-                                </artifactItem>
-                                <artifactItem>
-                                    <groupId>org.apache.hadoop</groupId>
-                                    <artifactId>hadoop-common</artifactId>
-                                    <version>${hadoop.version}</version>
-                                </artifactItem>
-                                <artifactItem>
-                                    <groupId>com.google.code.gson</groupId>
-                                    <artifactId>gson</artifactId>
-                                    <version>${gson.version}</version>
-                                </artifactItem>
-                                <artifactItem>
-                                    <groupId>log4j</groupId>
-                                    <artifactId>log4j</artifactId>
-                                    <version>${log4j.version}</version>
-                                </artifactItem>
-                            </artifactItems>
-                        </configuration>
                     </execution>
                     <execution>
-                        <id>copy-hook-shim</id>
-                        <phase>package</phase>
+                        <id>scala-test-compile-first</id>
+                        <phase>process-test-resources</phase>
                         <goals>
-                            <goal>copy</goal>
+                            <goal>testCompile</goal>
                         </goals>
-                        <configuration>
-                            <outputDirectory>${project.build.directory}/dependency/hook/storm</outputDirectory>
-                            <overWriteReleases>false</overWriteReleases>
-                            <overWriteSnapshots>false</overWriteSnapshots>
-                            <overWriteIfNewer>true</overWriteIfNewer>
-                            <artifactItems>
-                                <artifactItem>
-                                    <groupId>${project.groupId}</groupId>
-                                    <artifactId>storm-bridge-shim</artifactId>
-                                    <version>${project.version}</version>
-                                </artifactItem>
-                                <artifactItem>
-                                    <groupId>${project.groupId}</groupId>
-                                    <artifactId>atlas-plugin-classloader</artifactId>
-                                    <version>${project.version}</version>
-                                </artifactItem>
-                            </artifactItems>
-                        </configuration>
                     </execution>
                 </executions>
+                <configuration>
+                    <scalaVersion>${scala.version}</scalaVersion>
+                    <recompileMode>incremental</recompileMode>
+                    <useZincServer>true</useZincServer>
+                    <source>1.7</source>
+                    <target>1.7</target>
+                    <args>
+                        <arg>-unchecked</arg>
+                        <arg>-deprecation</arg>
+                        <arg>-feature</arg>
+                    </args>
+                    <jvmArgs>
+                        <jvmArg>-Xmx512m</jvmArg>
+                        <jvmArg>-XX:MaxPermSize=128m</jvmArg>
+                    </jvmArgs>
+                    <!--
+                    <javacArgs>
+                        <javacArg>-source</javacArg>
+                        <javacArg>${java.version}</javacArg>
+                        <javacArg>-target</javacArg>
+                        <javacArg>${java.version}</javacArg>
+                    </javacArgs>
+                    -->
+                    <!-- The following plugin is required to use quasiquotes in Scala 2.10 and is used
+                         by Spark SQL for code generation. -->
+                    <!--<compilerPlugins>
+                        <compilerPlugin>
+                            <groupId>org.scalamacros</groupId>
+                            <artifactId>paradise_${scala.version}</artifactId>
+                            <version>${scala.macros.version}</version>
+                        </compilerPlugin>
+                    </compilerPlugins>-->
+                </configuration>
             </plugin>
 
             <plugin>
@@ -399,6 +446,10 @@
                         <systemProperty>
                             <key>atlas.conf</key>
                             <value>${project.build.directory}/../../../typesystem/target/test-classes</value>
+                        </systemProperty>
+                        <systemProperty>
+                            <key>atlas.home</key>
+                            <value>${project.basedir}/target</value>
                         </systemProperty>
                     </systemProperties>
                     <stopKey>atlas-stop</stopKey>
@@ -457,30 +508,35 @@
                 <version>1.2.1</version>
                 <inherited>false</inherited>
                 <executions>
-                    <execution>
-                        <configuration>
-                            <mainClass>org.apache.atlas.storm.model.StormDataModelGenerator</mainClass>
-                            <systemProperties>
-                                <systemProperty>
-                                    <key>atlas.conf</key>
-                                    <value>${project.build.directory}/../../../typesystem/target/test-classes</value>
-                                </systemProperty>
-                            </systemProperties>
-                            <arguments>
-                                <argument>${project.build.directory}/models/storm_model.json</argument>
-                            </arguments>
-                        </configuration>
-                        <phase>package</phase>
-                        <goals>
-                            <goal>java</goal>
-                        </goals>
-                    </execution>
                 </executions>
             </plugin>
 
             <plugin>
                 <groupId>net.alchim31.maven</groupId>
                 <artifactId>scala-maven-plugin</artifactId>
+            </plugin>
+
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-resources-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>copy-resources</id>
+                        <phase>validate</phase>
+                        <goals>
+                            <goal>copy-resources</goal>
+                        </goals>
+                        <configuration>
+                            <outputDirectory>${basedir}/target/models</outputDirectory>
+                            <resources>
+                                <resource>
+                                    <directory>${basedir}/../models</directory>
+                                    <filtering>true</filtering>
+                                </resource>
+                            </resources>
+                        </configuration>
+                    </execution>
+                </executions>
             </plugin>
         </plugins>
     </build>

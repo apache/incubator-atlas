@@ -26,9 +26,7 @@ import org.apache.storm.generated.TopologyInfo;
 import org.apache.storm.utils.Utils;
 import org.apache.atlas.AtlasClient;
 import org.apache.atlas.AtlasConstants;
-import org.apache.atlas.fs.model.FSDataTypes;
 import org.apache.atlas.hive.bridge.HiveMetaStoreBridge;
-import org.apache.atlas.hive.model.HiveDataModelGenerator;
 import org.apache.atlas.hook.AtlasHook;
 import org.apache.atlas.storm.model.StormDataTypes;
 import org.apache.atlas.typesystem.Referenceable;
@@ -45,6 +43,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.Date;
 
 /**
  * StormAtlasHook sends storm topology metadata information to Atlas
@@ -117,7 +116,7 @@ public class StormAtlasHook extends AtlasHook implements ISubmitterHook {
             owner = ANONYMOUS_OWNER;
         }
         topologyReferenceable.set(AtlasClient.OWNER, owner);
-        topologyReferenceable.set("startTime", System.currentTimeMillis());
+        topologyReferenceable.set("startTime", new Date(System.currentTimeMillis()));
         topologyReferenceable.set(AtlasConstants.CLUSTER_NAME_ATTRIBUTE, getClusterName(stormConf));
 
         return topologyReferenceable;
@@ -212,7 +211,7 @@ public class StormAtlasHook extends AtlasHook implements ISubmitterHook {
                 break;
 
             case "HdfsBolt":
-                dataSetReferenceable = new Referenceable(FSDataTypes.HDFS_PATH().toString());
+                dataSetReferenceable = new Referenceable(HiveMetaStoreBridge.HDFS_PATH);
                 String hdfsUri = config.get("HdfsBolt.rotationActions") == null
                         ? config.get("HdfsBolt.fileNameFormat.path")
                         : config.get("HdfsBolt.rotationActions");
@@ -222,7 +221,7 @@ public class StormAtlasHook extends AtlasHook implements ISubmitterHook {
                 dataSetReferenceable.set("path", hdfsPathStr);
                 dataSetReferenceable.set(AtlasClient.OWNER, stormConf.get("hdfs.kerberos.principal"));
                 final Path hdfsPath = new Path(hdfsPathStr);
-                dataSetReferenceable.set(AtlasClient.NAME, hdfsPath.getName());
+                dataSetReferenceable.set(AtlasClient.NAME, Path.getPathWithoutSchemeAndAuthority(hdfsPath).toString().toLowerCase());
                 break;
 
             case "HiveBolt":
@@ -240,7 +239,7 @@ public class StormAtlasHook extends AtlasHook implements ISubmitterHook {
                 final String tableQualifiedName = HiveMetaStoreBridge.getTableQualifiedName(clusterName,
                         databaseName, hiveTableName);
                 dataSetReferenceable.set(AtlasClient.NAME, hiveTableName);
-                dataSetReferenceable.set(HiveDataModelGenerator.DB, dbReferenceable);
+                dataSetReferenceable.set(HiveMetaStoreBridge.DB, dbReferenceable);
                 dataSetReferenceable.set(AtlasClient.REFERENCEABLE_ATTRIBUTE_NAME, tableQualifiedName);
                 break;
 

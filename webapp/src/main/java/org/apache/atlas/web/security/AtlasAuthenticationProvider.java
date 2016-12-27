@@ -37,7 +37,12 @@ public class AtlasAuthenticationProvider extends
     private boolean fileAuthenticationMethodEnabled = true;
     private String ldapType = "NONE";
     public static final String FILE_AUTH_METHOD = "atlas.authentication.method.file";
+    public static final String LDAP_AUTH_METHOD = "atlas.authentication.method.ldap";
     public static final String LDAP_TYPE = "atlas.authentication.method.ldap.type";
+
+
+
+    private boolean ssoEnabled = false;
 
     @Autowired
     AtlasLdapAuthenticationProvider ldapAuthenticationProvider;
@@ -55,11 +60,16 @@ public class AtlasAuthenticationProvider extends
 
             this.fileAuthenticationMethodEnabled = configuration.getBoolean(
                     FILE_AUTH_METHOD, true);
-            this.ldapType = configuration.getString(LDAP_TYPE, "NONE");
+
+            boolean ldapAuthenticationEnabled = configuration.getBoolean(LDAP_AUTH_METHOD, false);
+
+            if (ldapAuthenticationEnabled) {
+                this.ldapType = configuration.getString(LDAP_TYPE, "NONE");
+            } else {
+                this.ldapType = "NONE";
+            }
         } catch (Exception e) {
-            LOG.error(
-                    "Error while getting atlas.login.method application properties",
-                    e);
+            LOG.error("Error while getting atlas.login.method application properties", e);
         }
     }
 
@@ -67,17 +77,27 @@ public class AtlasAuthenticationProvider extends
     public Authentication authenticate(Authentication authentication)
             throws AuthenticationException {
 
-        if (ldapType.equalsIgnoreCase("LDAP")) {
-            try {
-                authentication = ldapAuthenticationProvider.authenticate(authentication);
-            } catch (Exception ex) {
-                LOG.error("Error while LDAP authentication", ex);
+        if(ssoEnabled){
+            if (authentication != null){
+                authentication = getSSOAuthentication(authentication);
+                if(authentication!=null && authentication.isAuthenticated()){
+                    return authentication;
+                }
             }
-        } else if (ldapType.equalsIgnoreCase("AD")) {
-            try {
-                authentication = adAuthenticationProvider.authenticate(authentication);
-            } catch (Exception ex) {
-                LOG.error("Error while AD authentication", ex);
+        } else {
+
+            if (ldapType.equalsIgnoreCase("LDAP")) {
+                try {
+                    authentication = ldapAuthenticationProvider.authenticate(authentication);
+                } catch (Exception ex) {
+                    LOG.error("Error while LDAP authentication", ex);
+                }
+            } else if (ldapType.equalsIgnoreCase("AD")) {
+                try {
+                    authentication = adAuthenticationProvider.authenticate(authentication);
+                } catch (Exception ex) {
+                    LOG.error("Error while AD authentication", ex);
+                }
             }
         }
 
@@ -97,4 +117,15 @@ public class AtlasAuthenticationProvider extends
         throw new AtlasAuthenticationException("Authentication failed.");
     }
 
+    public boolean isSsoEnabled() {
+        return ssoEnabled;
+    }
+
+    public void setSsoEnabled(boolean ssoEnabled) {
+        this.ssoEnabled = ssoEnabled;
+    }
+
+    private Authentication getSSOAuthentication(Authentication authentication) throws AuthenticationException{
+        return authentication;
+    }
 }

@@ -19,14 +19,15 @@
 package org.apache.atlas.repository.graph;
 
 import com.google.inject.Inject;
-import com.tinkerpop.blueprints.Edge;
-import com.tinkerpop.blueprints.Vertex;
+import org.apache.atlas.repository.graphdb.AtlasEdge;
+import org.apache.atlas.repository.graphdb.AtlasVertex;
 import org.apache.atlas.AtlasException;
 import org.apache.atlas.RequestContext;
 import org.apache.atlas.typesystem.persistence.Id;
 import org.apache.atlas.typesystem.types.TypeSystem;
 
 import static org.apache.atlas.repository.Constants.MODIFICATION_TIMESTAMP_PROPERTY_KEY;
+import static org.apache.atlas.repository.Constants.MODIFIED_BY_KEY;
 import static org.apache.atlas.repository.Constants.STATE_PROPERTY_KEY;
 
 public class SoftDeleteHandler extends DeleteHandler {
@@ -36,7 +37,7 @@ public class SoftDeleteHandler extends DeleteHandler {
     }
 
     @Override
-    protected void _deleteVertex(Vertex instanceVertex, boolean force) {
+    protected void _deleteVertex(AtlasVertex instanceVertex, boolean force) {
         if (force) {
             graphHelper.removeVertex(instanceVertex);
         } else {
@@ -45,12 +46,13 @@ public class SoftDeleteHandler extends DeleteHandler {
                 GraphHelper.setProperty(instanceVertex, STATE_PROPERTY_KEY, Id.EntityState.DELETED.name());
                 GraphHelper.setProperty(instanceVertex, MODIFICATION_TIMESTAMP_PROPERTY_KEY,
                         RequestContext.get().getRequestTime());
+                GraphHelper.setProperty(instanceVertex, MODIFIED_BY_KEY, RequestContext.get().getUser());
             }
         }
     }
 
     @Override
-    protected void deleteEdge(Edge edge, boolean force) throws AtlasException {
+    protected void deleteEdge(AtlasEdge edge, boolean force) throws AtlasException {
         if (force) {
             graphHelper.removeEdge(edge);
         } else {
@@ -59,6 +61,7 @@ public class SoftDeleteHandler extends DeleteHandler {
                 GraphHelper.setProperty(edge, STATE_PROPERTY_KEY, Id.EntityState.DELETED.name());
                 GraphHelper
                         .setProperty(edge, MODIFICATION_TIMESTAMP_PROPERTY_KEY, RequestContext.get().getRequestTime());
+                GraphHelper.setProperty(edge, MODIFIED_BY_KEY, RequestContext.get().getUser());
             }
         }
     }

@@ -18,32 +18,39 @@
 
 package org.apache.atlas.discovery;
 
-import com.thinkaurelius.titan.core.TitanGraph;
 import org.apache.atlas.ApplicationProperties;
 import org.apache.atlas.AtlasClient;
+import org.apache.atlas.AtlasConfiguration;
 import org.apache.atlas.AtlasException;
-import org.apache.atlas.AtlasProperties;
 import org.apache.atlas.GraphTransaction;
 import org.apache.atlas.discovery.graph.DefaultGraphPersistenceStrategy;
 import org.apache.atlas.discovery.graph.GraphBackedDiscoveryService;
-import org.apache.atlas.query.GremlinQueryResult;
 import org.apache.atlas.query.InputLineageClosureQuery;
 import org.apache.atlas.query.OutputLineageClosureQuery;
 import org.apache.atlas.query.QueryParams;
+import org.apache.atlas.repository.Constants;
 import org.apache.atlas.repository.MetadataRepository;
-import org.apache.atlas.repository.graph.GraphProvider;
+import org.apache.atlas.repository.graph.AtlasGraphProvider;
+import org.apache.atlas.repository.graph.GraphHelper;
+import org.apache.atlas.repository.graphdb.AtlasGraph;
+import org.apache.atlas.repository.graphdb.AtlasVertex;
 import org.apache.atlas.typesystem.exception.EntityNotFoundException;
-import org.apache.atlas.typesystem.persistence.ReferenceableInstance;
+import org.apache.atlas.typesystem.exception.SchemaNotFoundException;
+import org.apache.atlas.typesystem.persistence.Id;
+import org.apache.atlas.typesystem.types.TypeUtils;
 import org.apache.atlas.utils.ParamChecker;
 import org.apache.commons.configuration.Configuration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import scala.Option;
 import scala.Some;
+import scala.collection.JavaConversions;
 import scala.collection.immutable.List;
 
 import javax.inject.Inject;
 import javax.inject.Singleton;
+import java.util.Arrays;
+import java.util.Iterator;
 
 /**
  * Hive implementation of Lineage service interface.
@@ -54,8 +61,8 @@ public class DataSetLineageService implements LineageService {
     private static final Logger LOG = LoggerFactory.getLogger(DataSetLineageService.class);
 
     private static final Option<List<String>> SELECT_ATTRIBUTES =
-            Some.<List<String>>apply(List.<String>fromArray(new String[]{AtlasClient.NAME,
-                    AtlasClient.REFERENCEABLE_ATTRIBUTE_NAME}));
+            Some.apply(JavaConversions.asScalaBuffer(Arrays.asList(AtlasClient.NAME,
+                    AtlasClient.REFERENCEABLE_ATTRIBUTE_NAME)).toList());
     public static final String SELECT_INSTANCE_GUID = "__guid";
 
     public static final String DATASET_SCHEMA_QUERY_PREFIX = "atlas.lineage.schema.query.";
@@ -63,10 +70,6 @@ public class DataSetLineageService implements LineageService {
     private static final String HIVE_PROCESS_TYPE_NAME = "Process";
     private static final String HIVE_PROCESS_INPUT_ATTRIBUTE_NAME = "inputs";
     private static final String HIVE_PROCESS_OUTPUT_ATTRIBUTE_NAME = "outputs";
-
-    private static final String DATASET_EXISTS_QUERY = AtlasClient.DATA_SET_SUPER_TYPE + " where __guid = '%s'";
-    private static final String DATASET_NAME_EXISTS_QUERY =
-            AtlasClient.DATA_SET_SUPER_TYPE + " where " + AtlasClient.REFERENCEABLE_ATTRIBUTE_NAME + "='%s' and __state = 'ACTIVE'";
 
     private static final Configuration propertiesConf;
 
@@ -79,14 +82,14 @@ public class DataSetLineageService implements LineageService {
     }
 
 
-    private final TitanGraph titanGraph;
+    private final AtlasGraph graph;
     private final DefaultGraphPersistenceStrategy graphPersistenceStrategy;
     private final GraphBackedDiscoveryService discoveryService;
 
     @Inject
-    DataSetLineageService(GraphProvider<TitanGraph> graphProvider, MetadataRepository metadataRepository,
+    DataSetLineageService(MetadataRepository metadataRepository,
                           GraphBackedDiscoveryService discoveryService) throws DiscoveryException {
-        this.titanGraph = graphProvider.get();
+        this.graph = AtlasGraphProvider.getGraphInstance();
         this.graphPersistenceStrategy = new DefaultGraphPersistenceStrategy(metadataRepository);
         this.discoveryService = discoveryService;
     }
@@ -102,8 +105,8 @@ public class DataSetLineageService implements LineageService {
     public String getOutputsGraph(String datasetName) throws AtlasException {
         LOG.info("Fetching lineage outputs graph for datasetName={}", datasetName);
         datasetName = ParamChecker.notEmpty(datasetName, "dataset name");
-        ReferenceableInstance datasetInstance = validateDatasetNameExists(datasetName);
-        return getOutputsGraphForId(datasetInstance.getId()._getId());
+        TypeUtils.Pair<String, String> typeIdPair = validateDatasetNameExists(datasetName);
+        return getOutputsGraphForId(typeIdPair.right);
     }
 
     /**
@@ -117,8 +120,8 @@ public class DataSetLineageService implements LineageService {
     public String getInputsGraph(String tableName) throws AtlasException {
         LOG.info("Fetching lineage inputs graph for tableName={}", tableName);
         tableName = ParamChecker.notEmpty(tableName, "table name");
-        ReferenceableInstance datasetInstance = validateDatasetNameExists(tableName);
-        return getInputsGraphForId(datasetInstance.getId()._getId());
+        TypeUtils.Pair<String, String> typeIdPair = validateDatasetNameExists(tableName);
+        return getInputsGraphForId(typeIdPair.right);
     }
 
     @Override
@@ -135,7 +138,7 @@ public class DataSetLineageService implements LineageService {
                 inputsQuery = new InputLineageClosureQuery(AtlasClient.DATA_SET_SUPER_TYPE, SELECT_INSTANCE_GUID,
                 guid, HIVE_PROCESS_TYPE_NAME,
                 HIVE_PROCESS_INPUT_ATTRIBUTE_NAME, HIVE_PROCESS_OUTPUT_ATTRIBUTE_NAME, Option.empty(),
-                SELECT_ATTRIBUTES, true, graphPersistenceStrategy, titanGraph);
+                SELECT_ATTRIBUTES, true, graphPersistenceStrategy, graph);
         return inputsQuery.graph().toInstanceJson();
     }
 
@@ -152,7 +155,7 @@ public class DataSetLineageService implements LineageService {
         OutputLineageClosureQuery outputsQuery =
                 new OutputLineageClosureQuery(AtlasClient.DATA_SET_SUPER_TYPE, SELECT_INSTANCE_GUID, guid, HIVE_PROCESS_TYPE_NAME,
                         HIVE_PROCESS_INPUT_ATTRIBUTE_NAME, HIVE_PROCESS_OUTPUT_ATTRIBUTE_NAME, Option.empty(),
-                        SELECT_ATTRIBUTES, true, graphPersistenceStrategy, titanGraph);
+                        SELECT_ATTRIBUTES, true, graphPersistenceStrategy, graph);
         return outputsQuery.graph().toInstanceJson();
     }
 
@@ -167,16 +170,20 @@ public class DataSetLineageService implements LineageService {
     public String getSchema(String datasetName) throws AtlasException {
         datasetName = ParamChecker.notEmpty(datasetName, "table name");
         LOG.info("Fetching schema for tableName={}", datasetName);
-        ReferenceableInstance datasetInstance = validateDatasetNameExists(datasetName);
+        TypeUtils.Pair<String, String> typeIdPair = validateDatasetNameExists(datasetName);
 
-        return getSchemaForId(datasetInstance.getTypeName(), datasetInstance.getId()._getId());
+        return getSchemaForId(typeIdPair.left, typeIdPair.right);
     }
 
-    private String getSchemaForId(String typeName, String guid) throws DiscoveryException {
-        final String schemaQuery =
-                String.format(propertiesConf.getString(DATASET_SCHEMA_QUERY_PREFIX + typeName), guid);
-        int limit = AtlasProperties.getProperty(AtlasProperties.AtlasProperty.SEARCH_MAX_LIMIT);
-        return discoveryService.searchByDSL(schemaQuery, new QueryParams(limit, 0));
+    private String getSchemaForId(String typeName, String guid) throws DiscoveryException, SchemaNotFoundException {
+        String configName = DATASET_SCHEMA_QUERY_PREFIX + typeName;
+        if (propertiesConf.getString(configName) != null) {
+            final String schemaQuery =
+                String.format(propertiesConf.getString(configName), guid);
+            int limit = AtlasConfiguration.SEARCH_MAX_LIMIT.getInt();
+            return discoveryService.searchByDSL(schemaQuery, new QueryParams(limit, 0));
+        }
+        throw new SchemaNotFoundException("Schema is not configured for type " + typeName + ". Configure " + configName);
     }
 
     @Override
@@ -193,14 +200,16 @@ public class DataSetLineageService implements LineageService {
      *
      * @param datasetName table name
      */
-    private ReferenceableInstance validateDatasetNameExists(String datasetName) throws AtlasException {
-        final String tableExistsQuery = String.format(DATASET_NAME_EXISTS_QUERY, datasetName);
-        GremlinQueryResult queryResult = discoveryService.evaluate(tableExistsQuery, new QueryParams(1, 0));
-        if (!(queryResult.rows().length() > 0)) {
-            throw new EntityNotFoundException(datasetName + " does not exist");
+    private TypeUtils.Pair<String, String> validateDatasetNameExists(String datasetName) throws AtlasException {
+        Iterator<AtlasVertex> results = graph.query().has("Referenceable.qualifiedName", datasetName)
+                                             .has(Constants.STATE_PROPERTY_KEY, Id.EntityState.ACTIVE.name())
+                                             .has(Constants.SUPER_TYPES_PROPERTY_KEY, AtlasClient.DATA_SET_SUPER_TYPE)
+                                             .vertices().iterator();
+        while (results.hasNext()) {
+            AtlasVertex vertex = results.next();
+            return TypeUtils.Pair.of(GraphHelper.getTypeName(vertex), GraphHelper.getIdFromVertex(vertex));
         }
-
-        return (ReferenceableInstance)queryResult.rows().apply(0);
+        throw new EntityNotFoundException("Dataset with name = " + datasetName + " does not exist");
     }
 
     /**
@@ -209,14 +218,11 @@ public class DataSetLineageService implements LineageService {
      * @param guid entity id
      */
     private String validateDatasetExists(String guid) throws AtlasException {
-        final String datasetExistsQuery = String.format(DATASET_EXISTS_QUERY, guid);
-        GremlinQueryResult queryResult = discoveryService.evaluate(datasetExistsQuery, new QueryParams(1, 0));
-        if (!(queryResult.rows().length() > 0)) {
-            throw new EntityNotFoundException("Dataset with guid = " + guid + " does not exist");
+        for (AtlasVertex vertex : (Iterable<AtlasVertex>) graph.query().has(Constants.GUID_PROPERTY_KEY, guid)
+                .has(Constants.SUPER_TYPES_PROPERTY_KEY, AtlasClient.DATA_SET_SUPER_TYPE)
+                .vertices()) {
+            return GraphHelper.getTypeName(vertex);
         }
-
-        ReferenceableInstance referenceable = (ReferenceableInstance)queryResult.rows().apply(0);
-        return referenceable.getTypeName();
+        throw new EntityNotFoundException("Dataset with guid = " + guid + " does not exist");
     }
-
 }

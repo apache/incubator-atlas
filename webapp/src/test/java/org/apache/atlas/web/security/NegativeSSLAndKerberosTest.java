@@ -20,7 +20,6 @@ package org.apache.atlas.web.security;
 
 import org.apache.atlas.ApplicationProperties;
 import org.apache.atlas.AtlasClient;
-import org.apache.atlas.AtlasException;
 import org.apache.atlas.web.TestUtils;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.PropertiesConfiguration;
@@ -61,7 +60,7 @@ public class NegativeSSLAndKerberosTest extends BaseSSLAndKerberosTest {
         // client will actually only leverage subset of these properties
         final PropertiesConfiguration configuration = getSSLConfiguration(providerUrl);
 
-        persistSSLClientConfiguration((org.apache.commons.configuration.Configuration) configuration);
+        persistSSLClientConfiguration(configuration);
 
         TestUtils.writeConfiguration(configuration, persistDir + File.separator +
             ApplicationProperties.APPLICATION_PROPERTIES);
@@ -87,19 +86,23 @@ public class NegativeSSLAndKerberosTest extends BaseSSLAndKerberosTest {
         configuration.setProperty("atlas.authentication.method.kerberos.name.rules",
                 "RULE:[1:$1@$0](.*@EXAMPLE.COM)s/@.*//\nDEFAULT");
 
+        configuration.setProperty("atlas.authentication.method.file", "true");
+        configuration.setProperty("atlas.authentication.method.file.filename", persistDir
+                + "/users-credentials");
+        configuration.setProperty("atlas.auth.policy.file",persistDir
+                + "/policy-store.txt" );
+
         TestUtils.writeConfiguration(configuration, persistDir + File.separator +
                 ApplicationProperties.APPLICATION_PROPERTIES);
+
+        setupUserCredential(persistDir);
+        setUpPolicyStore(persistDir);
 
         // save original setting
         originalConf = System.getProperty("atlas.conf");
         System.setProperty("atlas.conf", persistDir);
 
-        dgiClient = new AtlasClient(DGI_URL) {
-            @Override
-            protected PropertiesConfiguration getClientProperties() {
-                return configuration;
-            }
-        };
+        dgiClient = new AtlasClient(configuration, DGI_URL);
 
 
         secureEmbeddedServer = new TestSecureEmbeddedServer(21443, getWarPath()) {
