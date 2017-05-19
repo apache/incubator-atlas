@@ -60,7 +60,8 @@ define(['require',
                 addAssignTag: "[data-id='addAssignTag']",
                 editEntityButton: "[data-id='editEntityButton']",
                 createEntity: "[data-id='createEntity']",
-                checkDeletedEntity: "[data-id='checkDeletedEntity']"
+                checkDeletedEntity: "[data-id='checkDeletedEntity']",
+                containerCheckBox: "[data-id='containerCheckBox']"
             },
             templateHelpers: function() {
                 return {
@@ -125,7 +126,7 @@ define(['require',
              * @constructs
              */
             initialize: function(options) {
-                _.extend(this, _.pick(options, 'value', 'initialView', 'entityDefCollection', 'typeHeaders', 'searchVent'));
+                _.extend(this, _.pick(options, 'value', 'initialView', 'entityDefCollection', 'typeHeaders', 'searchVent', 'enumDefCollection'));
                 var pagination = "";
                 this.entityModel = new VEntity();
                 this.searchCollection = new VSearchList();
@@ -189,15 +190,17 @@ define(['require',
                 this.listenTo(this.searchCollection, "error", function(model, response) {
                     this.$('.fontLoader').hide();
                     this.$('.tableOverlay').hide();
-                    var responseJSON = response ? response.responseJSON : response;
-                    if (response && responseJSON && (responseJSON.errorMessage || responseJSON.message || responseJSON.error)) {
+                    var responseJSON = response && response.responseJSON ? response.responseJSON : null;
+                    if (responseJSON && (responseJSON.errorMessage || responseJSON.message || responseJSON.error)) {
                         Utils.notifyError({
                             content: responseJSON.errorMessage || responseJSON.message || responseJSON.error
                         });
                     } else {
-                        Utils.notifyError({
-                            content: "Invalid Expression : " + model.queryParams.query
-                        });
+                        if (response.statusText !== "abort") {
+                            Utils.notifyError({
+                                content: "Invalid Expression : " + model.queryParams.query
+                            });
+                        }
                     }
                 }, this);
                 this.listenTo(this.searchVent, "search:refresh", function(model, response) {
@@ -317,10 +320,10 @@ define(['require',
                     that.REntityTableLayoutView.show(new TableLayout(_.extend({}, that.commonTableOptions, {
                         columns: columns
                     })));
-                    if (that.searchCollection.models.length && that.value.searchType !== "dsl") {
-                        that.ui.checkDeletedEntity.show();
+                    if (that.value.searchType !== "dsl") {
+                        that.ui.containerCheckBox.show();
                     } else {
-                        that.ui.checkDeletedEntity.hide();
+                        that.ui.containerCheckBox.hide();
                     }
                     that.ui.paginationDiv.show();
                     that.$(".ellipsis .inputAssignTag").hide();
@@ -487,7 +490,8 @@ define(['require',
                         },
                         tagList: that.getTagList(guid, multiple),
                         showLoader: that.showLoader.bind(that),
-                        hideLoader: that.hideLoader.bind(that)
+                        hideLoader: that.hideLoader.bind(that),
+                        enumDefCollection: that.enumDefCollection
                     });
                 });
             },

@@ -139,9 +139,9 @@ require.config({
         'moment': 'libs/moment/js/moment.min',
         'jquery-ui': 'external_lib/jquery-ui/jquery-ui.min',
         'datetimepicker': 'external_lib/datetimepicker/bootstrap-datetimepicker',
-        'pnotify': 'external_lib/pnotify/pnotify',
-        'pnotify.buttons': 'external_lib/pnotify/pnotify.buttons',
-        'pnotify.confirm': 'external_lib/pnotify/pnotify.confirm',
+        'pnotify': 'external_lib/pnotify/pnotify.custom.min',
+        'pnotify.buttons': 'external_lib/pnotify/pnotify.custom.min',
+        'pnotify.confirm': 'external_lib/pnotify/pnotify.custom.min',
         'jquery-placeholder': 'libs/jquery-placeholder/js/jquery.placeholder',
         'platform': 'libs/platform/platform'
     },
@@ -168,15 +168,19 @@ require(['App',
     'select2'
 ], function(App, Router, CommonViewFunction, Globals, UrlLinks, VEntityList, VTagList) {
     var that = this;
-    this.asyncFetchCounter = 3;
+    this.asyncFetchCounter = 4;
     this.entityDefCollection = new VEntityList();
     this.entityDefCollection.url = UrlLinks.entitiesDefApiUrl();
     this.typeHeaders = new VTagList();
     this.typeHeaders.url = UrlLinks.typesApiUrl();
+    this.enumDefCollection = new VTagList();
+    this.enumDefCollection.url = UrlLinks.enumDefApiUrl();
+    this.enumDefCollection.modelAttrName = "enumDefs";
 
     App.appRouter = new Router({
         entityDefCollection: this.entityDefCollection,
-        typeHeaders: this.typeHeaders
+        typeHeaders: this.typeHeaders,
+        enumDefCollection: this.enumDefCollection
     });
 
     var startApp = function() {
@@ -222,6 +226,13 @@ require(['App',
         }
     });
     this.typeHeaders.fetch({
+        skipDefaultError: true,
+        complete: function() {
+            --that.asyncFetchCounter;
+            startApp();
+        }
+    });
+    this.enumDefCollection.fetch({
         skipDefaultError: true,
         complete: function() {
             --that.asyncFetchCounter;
