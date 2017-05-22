@@ -35,10 +35,12 @@ public class AtlasAuthenticationProvider extends
             .getLogger(AtlasAuthenticationProvider.class);
 
     private boolean fileAuthenticationMethodEnabled = true;
+    private boolean pamAuthenticationEnabled = false;
     private String ldapType = "NONE";
     public static final String FILE_AUTH_METHOD = "atlas.authentication.method.file";
     public static final String LDAP_AUTH_METHOD = "atlas.authentication.method.ldap";
     public static final String LDAP_TYPE = "atlas.authentication.method.ldap.type";
+    public static final String PAM_AUTH_METHOD = "atlas.authentication.method.pam";
 
 
 
@@ -53,6 +55,9 @@ public class AtlasAuthenticationProvider extends
     @Autowired
     AtlasADAuthenticationProvider adAuthenticationProvider;
 
+    @Autowired
+    AtlasPamAuthenticationProvider pamAuthenticationProvider;
+
     @PostConstruct
     void setAuthenticationMethod() {
         try {
@@ -61,6 +66,8 @@ public class AtlasAuthenticationProvider extends
             this.fileAuthenticationMethodEnabled = configuration.getBoolean(
                     FILE_AUTH_METHOD, true);
 
+            this.pamAuthenticationEnabled = configuration.getBoolean(PAM_AUTH_METHOD, false);
+
             boolean ldapAuthenticationEnabled = configuration.getBoolean(LDAP_AUTH_METHOD, false);
 
             if (ldapAuthenticationEnabled) {
@@ -68,6 +75,7 @@ public class AtlasAuthenticationProvider extends
             } else {
                 this.ldapType = "NONE";
             }
+
         } catch (Exception e) {
             LOG.error("Error while getting atlas.login.method application properties", e);
         }
@@ -98,13 +106,19 @@ public class AtlasAuthenticationProvider extends
                 } catch (Exception ex) {
                     LOG.error("Error while AD authentication", ex);
                 }
+            } else if (pamAuthenticationEnabled) {
+                try {
+                    authentication = pamAuthenticationProvider.authenticate(authentication);
+                } catch (Exception ex) {
+                    LOG.error("Error while PAM authentication", ex);
+                }
             }
         }
 
         if (authentication != null) {
             if (authentication.isAuthenticated()) {
                 return authentication;
-            } else if (fileAuthenticationMethodEnabled) {  // If the LDAP/AD authentication fails try the local filebased login method
+            } else if (fileAuthenticationMethodEnabled) {  // If the LDAP/AD/PAM authentication fails try the local filebased login method
                 authentication = fileAuthenticationProvider.authenticate(authentication);
 
                 if (authentication != null && authentication.isAuthenticated()) {
