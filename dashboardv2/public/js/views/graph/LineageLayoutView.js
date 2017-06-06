@@ -165,12 +165,10 @@ define(['require',
                             fill: 'none',
                             stroke: '#fb4200'
                         }
-                        if(node.fromEntityId != last_fromEntityId){
-                           last_fromEntityId = node.toEntityId;
+                        if(node.toEntityId != last_fromEntityId){
+                           last_fromEntityId = node.fromEntityId;
                            that.g.setEdge(node.fromEntityId, node.toEntityId, { 'arrowhead': "arrowPoint", lineInterpolate: 'basis', "style": "fill:" + styleObj.fill + ";stroke:" + styleObj.stroke + "", 'styleObj': styleObj });
                            that.checkForLineageOrImpactFlag(relations, node.toEntityId);
-                        }else{
-                           last_fromEntityId = ''; 
                         }
                     });
                 }
