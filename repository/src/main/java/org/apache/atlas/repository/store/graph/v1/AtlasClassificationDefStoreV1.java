@@ -43,7 +43,7 @@ import java.util.regex.Pattern;
  */
 public class AtlasClassificationDefStoreV1 extends AtlasAbstractDefStoreV1 implements AtlasClassificationDefStore {
     private static final Logger LOG = LoggerFactory.getLogger(AtlasClassificationDefStoreV1.class);
-    private static final String TRAIT_NAME_REGEX = "[a-zA-Z\\u4e00-\\u9fa5][\\u4e00-\\u9fa5a-zA-Z0-9_ ]*";
+    private static final String TRAIT_NAME_REGEX = "[a-zA-Z\\u4e00-\\u9fa5][\\u4e00-\\u9fa5a-zA-Z0-9_ .]*";
     private static final Pattern TRAIT_NAME_PATTERN = Pattern.compile(TRAIT_NAME_REGEX);
 
     public AtlasClassificationDefStoreV1(AtlasTypeDefGraphStoreV1 typeDefStore, AtlasTypeRegistry typeRegistry) {
