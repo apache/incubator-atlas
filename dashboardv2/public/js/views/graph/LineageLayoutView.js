@@ -127,6 +127,9 @@ define(['require',
                     if (entityDef && entityDef.get('superTypes')) {
                         obj['isProcess'] = _.contains(entityDef.get('superTypes'), "Process") ? true : false;
                     }
+                    if (obj['typeName'] && obj['typeName'] == "Process") {
+                   	 	obj['isProcess'] = true;
+                    }
 
                     return obj;
                 }
