@@ -28,7 +28,7 @@ define(['require',
     'utils/UrlLinks'
 ], function(require, Backbone, LineageLayoutViewtmpl, VLineageList, VEntity, Utils, dagreD3, d3Tip, Enums, UrlLinks) {
     'use strict';
-
+    var last_fromEntityId = '';
     var LineageLayoutView = Backbone.Marionette.LayoutView.extend(
         /** @lends LineageLayoutView */
         {
@@ -165,8 +165,11 @@ define(['require',
                             fill: 'none',
                             stroke: '#fb4200'
                         }
-                        that.g.setEdge(node.fromEntityId, node.toEntityId, { 'arrowhead': "arrowPoint", lineInterpolate: 'basis', "style": "fill:" + styleObj.fill + ";stroke:" + styleObj.stroke + "", 'styleObj': styleObj });
-                        that.checkForLineageOrImpactFlag(relations, node.toEntityId);
+                        if(node.toEntityId != last_fromEntityId){
+                           last_fromEntityId = node.fromEntityId;
+                           that.g.setEdge(node.fromEntityId, node.toEntityId, { 'arrowhead': "arrowPoint", lineInterpolate: 'basis', "style": "fill:" + styleObj.fill + ";stroke:" + styleObj.stroke + "", 'styleObj': styleObj });
+                           that.checkForLineageOrImpactFlag(relations, node.toEntityId);
+                        }
                     });
                 }
             },
