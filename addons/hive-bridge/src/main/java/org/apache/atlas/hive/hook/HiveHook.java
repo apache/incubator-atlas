@@ -664,12 +664,13 @@ public class HiveHook extends AtlasHook implements ExecuteWithHookContext {
                     sortedHiveOutputs.addAll(event.getOutputs());
                 }
 
-                for (ReadEntity readEntity : sortedHiveInputs) {
-                    processHiveEntity(dgiBridge, event, readEntity, dataSets, source, entities);
-                }
 
                 for (WriteEntity writeEntity : sortedHiveOutputs) {
                     processHiveEntity(dgiBridge, event, writeEntity, dataSets, target, entities);
+                }
+
+                for (ReadEntity readEntity : sortedHiveInputs) {
+                    processHiveEntity(dgiBridge, event, readEntity, dataSets, source, entities);
                 }
 
                 if (source.size() > 0 || target.size() > 0) {
