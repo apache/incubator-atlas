@@ -58,6 +58,19 @@ LOGFILE="$ATLAS_LOG_DIR/import-hive.log"
 
 TIME=`date +%Y%m%d%H%M%s`
 
+#Add hadoop conf in classpath
+if [ ! -z "$HADOOP_CLASSPATH" ]; then
+    HADOOP_CP=$HADOOP_CLASSPATH
+elif [ ! -z "$HADOOP_HOME" ]; then
+    HADOOP_CP=`$HADOOP_HOME/bin/hadoop classpath`
+elif [ $(command -v hadoop) ]; then
+    HADOOP_CP=`hadoop classpath`
+    echo $HADOOP_CP
+else
+    echo "Environment variable HADOOP_CLASSPATH or HADOOP_HOME need to be set"
+    exit 1
+fi
+
 #Add hive conf in classpath
 if [ ! -z "$HIVE_CONF_DIR" ]; then
     HIVE_CONF=$HIVE_CONF_DIR
@@ -91,19 +104,6 @@ HIVE_CP="${HIVE_CONF}"
 for i in "${HIVE_HOME}/lib/"*.jar; do
     HIVE_CP="${HIVE_CP}:$i"
 done
-
-#Add hadoop conf in classpath
-if [ ! -z "$HADOOP_CLASSPATH" ]; then
-    HADOOP_CP=$HADOOP_CLASSPATH
-elif [ ! -z "$HADOOP_HOME" ]; then
-    HADOOP_CP=`$HADOOP_HOME/bin/hadoop classpath`
-elif [ $(command -v hadoop) ]; then
-    HADOOP_CP=`hadoop classpath`
-    echo $HADOOP_CP
-else
-    echo "Environment variable HADOOP_CLASSPATH or HADOOP_HOME need to be set"
-    exit 1
-fi
 
 CP="${ATLASCPPATH}:${HIVE_CP}:${HADOOP_CP}"
 
