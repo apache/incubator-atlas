@@ -382,7 +382,7 @@ public abstract class AtlasTypeDefGraphStore implements AtlasTypeDefStore, Activ
         AtlasTypesDef ret = updateGraphStore(typesDef, ttr);
 
         try {
-            ttr.updateTypesWithNoRefResolve(ret);
+            ttr.updateTypes(ret);
         } catch (AtlasBaseException e) { // this shouldn't happen, as the types were already validated
           LOG.error("failed to update the registry after updating the store", e);
         }
