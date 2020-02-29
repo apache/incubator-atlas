@@ -30,7 +30,7 @@ public class SHA256Utils{
                 @Override
                 protected MessageDigest initialValue() {
                     try {
-                        return MessageDigest.getInstance("SHA-256");
+                        return MessageDigest.getInstance("SHA-512");
                     } catch (NoSuchAlgorithmException e) {
                         throw new RuntimeException(e);
                     }
