@@ -493,7 +493,7 @@
         <solr.version>5.5.1</solr.version>
         <kafka.version>0.10.0.0</kafka.version>
         <curator.version>2.11.0</curator.version>
-        <zookeeper.version>3.4.6</zookeeper.version>
+        <zookeeper.version>3.4.14</zookeeper.version>
 
         <!-- scala versions -->
         <scala.version>2.11.8</scala.version>
